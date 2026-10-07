@@ -40,6 +40,13 @@ The plugin's hooks do nothing in a project until setup has written
 
 Skip the first three for a change you can describe in one sentence.
 
+Outside the stages:
+
+| Command | Use |
+|---|---|
+| `/dev-groundwork:test-first <change>` | A small change or bug fix, red-green-refactor, with the test shown failing without the change |
+| `/dev-groundwork:debug <symptom>` | A failure or bug: root cause first, one hypothesis at a time, then test-first |
+
 ## What enforces what
 
 | Mechanism | Enforces |

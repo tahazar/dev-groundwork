@@ -1,6 +1,6 @@
 ---
 name: acceptance-tests
-description: Stage 4 of the development pipeline. Write failing tests tagged with acceptance-criterion IDs before any implementation. Use after the design is approved, or as the first step of a bug fix.
+description: Stage 4 of the development pipeline. Write failing tests tagged with acceptance-criterion IDs before any implementation. Use after the design is approved. Bug fixes use debug and test-first instead.
 argument-hint: <feature-name>
 arguments: [feature]
 ---

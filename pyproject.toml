@@ -1,6 +1,6 @@
 [project]
 name = "dev-groundwork"
-version = "0.2.0"
+version = "0.3.0"
 description = "Check scripts and hooks for the dev-groundwork Claude Code plugin."
 requires-python = ">=3.10"
 license = { text = "MIT" }
