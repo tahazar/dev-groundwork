@@ -25,3 +25,22 @@ awh_analysis/report.py:save_record: jedi references=2 bare-name calls in repo=5 
 awh_analysis/__main__.py:main: jedi references=2 bare-name calls in repo=4 seconds=0.0
     awh_analysis/__main__.py 1149
     tests/test_cli.py 14
+
+# Go-to-definition, added for the design stage (same commit and versions)
+
+$ node ts_def.cjs <typescript> packages/cli/tsconfig.json packages/cli/src/index.ts 614 readClipIfPresent
+readClipIfPresent at packages/cli/src/index.ts:614 -> 1 definition(s)
+   packages/cli/src/index.ts:2278 local function readClipIfPresent
+
+$ node ts_def.cjs <typescript> packages/cli/tsconfig.json packages/cli/src/index.ts 432 parseNotation
+parseNotation at packages/cli/src/index.ts:432 -> 1 definition(s)
+   packages/cli/node_modules/@awh/core/dist/notation/barbeat.d.ts:39 function parseNotation
+
+$ node ts_def.cjs <typescript> packages/cli/tsconfig.json packages/cli/src/index.ts 432 parseNotation '{"@awh/core":["<repo>/packages/core/src/index.ts"]}'
+parseNotation at packages/cli/src/index.ts:432 -> 1 definition(s)
+   packages/core/src/notation/barbeat.ts:98 function parseNotation
+
+$ python py_def.py analysis awh_analysis/__main__.py:107:save_record awh_analysis/__main__.py:152:save_record awh_analysis/__main__.py:589:save_record
+save_record at awh_analysis/__main__.py:107 -> ['awh_analysis/report.py:377']
+save_record at awh_analysis/__main__.py:152 -> ['awh_analysis/report.py:377']
+save_record at awh_analysis/__main__.py:589 -> ['awh_analysis/drumstats.py:372']

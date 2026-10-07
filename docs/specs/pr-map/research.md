@@ -74,6 +74,22 @@ incomplete, not as "no callers". MIT licensed (C25).
 command line only reports diagnostics; references need its language
 server (C18). Rejected for version 1.
 
+## Addendum for the design: go to definition
+
+Added 2026-10-07 during design, because the design asks "which definition
+does this call point to?" at each call site, which research had not
+measured.
+
+- TypeScript's LanguageService declares `getDefinitionAtPosition` (C36).
+  Inside one package it found the exact local function (C37).
+- A call into another workspace package resolved to that package's built
+  declaration file under `dist`, not its source (C38), and only works
+  after a build. Pointing the compiler option `paths` (C39) at the
+  package's source entry resolved the same call to the source definition,
+  with no build (C40).
+- jedi's `goto` follows imports when asked (C41) and resolved three calls
+  named `save_record` to the two different functions they mean (C42).
+
 ## Answers to open questions
 
 - Package line above the diagram: deferred to the owner after version 1, as
@@ -334,4 +350,42 @@ server (C18). Rejected for version 1.
   tier: 1
   quote: "(module (expression_statement (assignment left: (identifier) @name) @definition.constant))"
   retrieved: 2026-10-07
+- id: C36
+  claim: TypeScript 5.9.3's LanguageService declares getDefinitionAtPosition(fileName, position).
+  source: https://raw.githubusercontent.com/microsoft/TypeScript/v5.9.3/src/services/types.ts
+  tier: 1
+  quote: "getDefinitionAtPosition(fileName: string, position: number): readonly DefinitionInfo[] | undefined;"
+  retrieved: 2026-10-07
+- id: C37
+  claim: getDefinitionAtPosition resolved a call to readClipIfPresent to its local definition at line 2278.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "packages/cli/src/index.ts:2278 local function readClipIfPresent"
+- id: C38
+  claim: Without a paths override, a CLI call to parseNotation resolved to core's built declaration file.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "packages/cli/node_modules/@awh/core/dist/notation/barbeat.d.ts:39 function parseNotation"
+- id: C39
+  claim: TypeScript 5.9.3's compiler options include paths.
+  source: https://raw.githubusercontent.com/microsoft/TypeScript/v5.9.3/src/compiler/types.ts
+  tier: 1
+  quote: "paths?: MapLike<string[]>;"
+  retrieved: 2026-10-07
+- id: C40
+  claim: With paths pointing @awh/core at core's source entry, the same call resolved to the source definition.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "packages/core/src/notation/barbeat.ts:98 function parseNotation"
+- id: C41
+  claim: jedi's goto can follow imports.
+  source: https://raw.githubusercontent.com/davidhalter/jedi/master/jedi/api/__init__.py
+  tier: 1
+  quote: ":param follow_imports: The method will follow imports."
+  retrieved: 2026-10-07
+- id: C42
+  claim: jedi's goto resolved the call at line 589 named save_record to drumstats.py rather than report.py.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "save_record at awh_analysis/__main__.py:589 -> ['awh_analysis/drumstats.py:372']"
 ```
