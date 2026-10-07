@@ -17,8 +17,10 @@ away is a guess, and a guess that happens to pass hides the real cause.
 - Reproduce it locally with one command and keep the output. If it does not
   reproduce, find out what differs (environment, versions, data, order of
   tests) before going further. "Flaky" is a symptom, not a cause.
-- Check whether the base branch fails the same way. If it does, the cause
-  is not in this change; say so and find the change that introduced it.
+- Check whether the base branch fails the same way, in a separate worktree
+  (`git worktree add <scratch dir> origin/main`) rather than by switching
+  or stashing the current tree. If it fails there too, the cause is not in
+  this change; say so and find the change that introduced it.
 
 ## 2. Trace to the origin
 
@@ -45,6 +47,11 @@ away is a guess, and a guess that happens to pass hides the real cause.
 
 Once the cause is confirmed, run `/dev-groundwork:test-first` with a test
 that reproduces the symptom. The fix goes at the origin found in step 2.
+
+While tests are locked (`.groundwork/state/tests-locked` exists, during
+implement), the approved test that fails is the red step: fix the code
+until it passes. If the bug needs a test the approved ones do not cover,
+stop and tell the user; only they can lift the lock.
 
 A timing problem is fixed by waiting for the condition that matters, not by
 a longer sleep. If no signal exists, the delay says what it waits for and

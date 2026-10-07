@@ -10,6 +10,10 @@ arguments: [change]
 A test you never saw fail proves nothing: it may pass because it tests the
 wrong thing. Every step below keeps its command output.
 
+While tests are locked (`.groundwork/state/tests-locked` exists), do not
+write or edit tests: the approved failing test is the red step, so start at
+step 2. If a new test is needed, stop and tell the user.
+
 ## 1. Red
 
 - Write one test for the behavior the change adds or the bug breaks. For a
@@ -24,9 +28,11 @@ wrong thing. Every step below keeps its command output.
 
 - Write the least code that makes the test pass. No options, layers or
   clean-ups the test does not need.
-- Run the test, then the project's full checks (the `onCommit` command in
-  `.groundwork/config.json`). A failure anywhere is yours to fix or to
-  report by name, even if this change did not cause it.
+- Run the test, then the project's full checks: the `onCommit` command in
+  `.groundwork/config.json`, or, if it is unset, the format, lint,
+  typecheck and test commands the project documents. A failure anywhere
+  is yours to fix or to report by name, even if this change did not cause
+  it.
 
 ## 3. Refactor
 
@@ -35,10 +41,21 @@ behavior in this step.
 
 ## 4. Prove the test guards the change
 
-Remove the code change while keeping the test (for example
-`git stash push -- <changed source files>`), run the test and confirm it
-fails, then restore the change and confirm it passes. Keep both outputs. A
-test that still passes without the change does not guard it.
+Take the code change out, keep the test, and watch the test fail; then put
+the change back and watch it pass. Name only source files, never tests:
+
+```bash
+git add -N <new source files>       # so the diff includes new files
+patch=$(mktemp)
+git diff -- <changed source files> > "$patch"
+test -s "$patch"                    # an empty patch means a wrong file list: stop
+git apply -R "$patch"               # run the test: it must fail
+git apply "$patch"                  # run the test: it must pass
+```
+
+Keep both outputs. A test that still passes without the change does not
+guard it. Do not use `git stash` for this: with nothing to stash it saves
+nothing, and the restore then applies an older, unrelated stash.
 
 ## 5. Commit
 
