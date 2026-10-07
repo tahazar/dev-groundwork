@@ -1,0 +1,27 @@
+# Spike results, run 2026-10-07 against tahazar/ableton-workflow-helper at f099655
+# Python 3.13.16; tree-sitter 0.26.0, tree-sitter-typescript 0.23.2, tree-sitter-python 0.25.0, jedi 0.20.0; typescript 5.9.3
+
+$ python ts_defs.py <repo>
+ts: files=128 definitions=723 call-refs=12810 files-with-parse-errors=0 seconds=0.18
+tsx: files=0 definitions=0 call-refs=0 files-with-parse-errors=0 seconds=0.00
+py: files=50 definitions=494 call-refs=4191 files-with-parse-errors=0 seconds=0.07
+broken snippet: has_error True definitions found: ['ok', 'ok', 'after']
+
+$ python ambiguity.py <repo>
+.ts: calls whose name matches a repo definition=3916, of which match 2+ definitions=1016 (26%); most-duplicated names: [('make', 18), ('fail', 9), ('capture', 8), ('constructor', 7), ('scanner', 6), ('caller', 5), ('ctx', 4), ('setDeviceParam', 4)]
+.py: calls whose name matches a repo definition=1173, of which match 2+ definitions=151 (13%); most-duplicated names: [('main', 4), ('test_determinism', 4), ('_write', 3), ('save_record', 2), ('analyze', 2), ('embed_audio_batch', 2), ('embed_text', 2), ('snap_down', 2)]
+
+$ node ts_refs.cjs <typescript> packages/cli/tsconfig.json packages/cli/src/index.ts readClipIfPresent
+files in program=18 references to readClipIfPresent=4 seconds=1.0
+  packages/cli/src/index.ts:614
+  packages/cli/src/index.ts:1883
+  packages/cli/src/index.ts:2437
+  packages/cli/src/index.ts:6031
+
+$ python py_refs.py analysis awh_analysis/report.py:save_record awh_analysis/__main__.py:main
+awh_analysis/report.py:save_record: jedi references=2 bare-name calls in repo=5 seconds=0.4
+    awh_analysis/__main__.py 107
+    awh_analysis/__main__.py 152
+awh_analysis/__main__.py:main: jedi references=2 bare-name calls in repo=4 seconds=0.0
+    awh_analysis/__main__.py 1149
+    tests/test_cli.py 14

@@ -1,6 +1,6 @@
 # Requirements: pr-map
 
-- Status: draft
+- Status: approved (2026-10-07, by the owner)
 - Requested by: the owner, 2026-10-07: "adding a GitHub action to generate a
   visual in our PRs to enable quick code reviews", inspired by Etchpad
   ("every wire a reference that actually exists ... never hallucinated").
