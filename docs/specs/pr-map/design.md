@@ -227,17 +227,31 @@ class Arrow:
        Python, `constructor` in TypeScript) uses its class's name as its
        match key, because a call reads `Foo(1)` or `new Foo(1)`, never
        `__init__`. jedi's reference search does not find those calls
-       either (C50). In Python, the names of subclasses that define no
-       `__init__` or `__new__` of their own are match keys too, followed
-       down the hierarchy, because `Baz(3)` runs `Foo.__init__` when
-       `Baz(Foo)` does not override it. Each subclass's base names are
-       resolved with `goto` (C41). TypeScript's `findReferences` on the
-       constructor already finds `new Baz(3)` and `super(…)`.
+       either (C50).
+     - **Python subclasses.** `Baz(3)` runs `Foo.__init__` when `Baz`
+       does not get an `__init__` from somewhere else first. pr-map
+       builds each class's method resolution order from its base names,
+       each resolved with `goto` (C41), using Python's C3 linearization.
+       A constructor box's *runners* are the classes whose order reaches
+       T's class before any other class defining that method. A mixin
+       listed before `Foo` that defines `__init__` takes the class out of
+       the set; so does a subclass with its own `__init__`. The runners'
+       names are match keys.
+     - **The method's own name** (`__init__`, `__new__`) is a match key
+       too, so `super().__init__(…)` and `Foo.__init__(self, …)` are
+       found by tree-sitter even if jedi stops early (C24).
+     - TypeScript's `findReferences` on a constructor finds `new this`,
+       `super(…)` and calls of a subclass without its own constructor
+       (C62).
      - **Python calls on the runtime class.** `cls(…)` inside a
-       classmethod and `type(self)(…)` inside a method of the class or a
-       subclass are candidates for its constructor. Which class runs is
+       classmethod and `type(self)(…)` inside a method of one of the
+       constructor's runners are candidates for it. Which class runs is
        decided at run time, so they are possible arrows, reason "through
        `cls`".
+     - **TypeScript `super` and `this`.** `super(…)` and `new this(…)`
+       are parsed as `super` and `this` nodes, not identifiers. Inside a
+       changed or added box they are callee candidates;
+       `getDefinitionAtPosition` answers the constructor they run (C61).
      - **Node kinds.** In TypeScript the kinds are `identifier`,
        `property_identifier`, `shorthand_property_identifier` and
        `type_identifier`, the last so that type-only uses (`x: R`,
@@ -289,12 +303,20 @@ class Arrow:
        `super(…)` do; a type annotation or `Foo.make()` answers with the
        class alone and counts as the class.
      - **Python:** a class answer counts as `__init__` or `__new__` only
-       when the identifier is the function of a call node (`Foo(1)`,
-       `Baz(3)` for a subclass without its own constructor). An
+       when the identifier is the function of a call node, and the class
+       is T's class or one of T's runners (`Foo(1)`, `Baz(3)`). An
        annotation, `Foo.make()` and `isinstance(x, Foo)` count as the
        class.
+     - **Each answer is read against the target it is a candidate for.**
+       When T is the class box, a class answer, or TypeScript's class and
+       constructor pair, counts as T. So a class changed by a field still
+       gets its `Foo(1)` and `new Foo(1)` callers. When T is the
+       constructor box, the rules above apply. When both changed, the
+       call is an arrow to each.
      - **Removed constructors** never match a class answer: the call no
-       longer runs them.
+       longer runs them. The calls are listed in the text section as
+       "called `Foo(…)`, whose `__init__` was removed", because they may
+       now pass the wrong arguments.
      - **A callee `new Foo()`** is one arrow, to the constructor box
        when the class defines one, else to the class box.
    - **Library calls are recognised before anything is drawn.** Without
@@ -314,8 +336,10 @@ class Arrow:
      initial value is traced the same way: `const program = new
      Command()` or `arr = np.array(xs)` makes `program.action(...)` and
      `arr.mean()` library calls. This follows one assignment in the same
-     scope. A variable assigned more than once, or a parameter, is not
-     traced, and its calls stay as unresolved.
+     scope. A parameter whose type annotation names a library import
+     (`cmd: Command`) is traced through that import. A variable assigned
+     more than once, or an untyped parameter, is not traced, and its
+     calls stay as unresolved.
 
      A library call draws no arrow. The text section counts library calls
      per file, so nothing disappears silently.
@@ -326,12 +350,15 @@ class Arrow:
        classes and typed object literals (C43 to C45, C54).
      - **TypeScript, structural:** T is a method, and the box is an
        interface method signature, or a property signature with a
-       function type, with T's name. TypeScript matches classes to
-       interfaces by shape, so a class with no `implements` clause can
-       still be called through the interface, and `findReferences` on T
-       would not link them. A plain data property with T's name is not
-       related: `c.notes` on `interface Clip { notes: number[] }` says
-       nothing about a function `notes()`.
+       function type, with T's name, *and* the type checker reports T's
+       class assignable to that interface (`isTypeAssignableTo`, C63).
+       TypeScript matches classes to interfaces by shape, so a class with
+       no `implements` clause can still be called through the interface,
+       and `findReferences` on T would not link them. A same-named method
+       on an incompatible interface is not related (C64). A plain data
+       property with T's name is not related either: `c.notes` on
+       `interface Clip { notes: number[] }` says nothing about a function
+       `notes()`. The helper gains one request kind for the check.
      - **Python:** the box is a member with T's name in a class that T's
        class inherits from, directly or further up. Each base-class name
        is resolved with `goto` (C41), not matched by text. The same holds
@@ -379,7 +406,14 @@ class Arrow:
    - **Python.** One `jedi.Project` per nearest directory with
      `pyproject.toml`, `setup.cfg` or `setup.py`, else the repository
      root. `Script.goto(line, column, follow_imports=True)` (C41), and
-     `get_references` (C17b). Columns are converted from tree-sitter's
+     `get_references` (C17b).
+     - **No inferred parameter types.** jedi infers an untyped
+       parameter's type from the calls it sees, which is on by default
+       (C58, C59). With it on, `obj.save()` on an untyped parameter
+       answered one class's method although two classes are passed in. A
+       guess like that would become a solid arrow, and the other class's
+       caller would vanish. pr-map turns both settings off, so the answer
+       is empty (C60) and the call is a possible arrow, as AC-6 says. Columns are converted from tree-sitter's
      bytes to characters. jedi answers carry line and column.
    - **TypeScript.** `resolve_ts.cjs` loads the pinned typescript and
      keeps one LanguageService per nearest `tsconfig.json` (default
@@ -394,7 +428,8 @@ class Arrow:
        name a package.
      - Protocol: one JSON object per line. Requests are
        `{"id", "op": "definition" | "references", "file", "line",
-       "column"}`, with columns in UTF-16 code units, converted in
+       "column"}` (and `"op": "assignable"` with two locations), with
+       columns in UTF-16 code units, converted in
        Python. Answers are `{"id", "locations": [{"file", "line",
        "column", "kind"}]}` or `{"id", "error"}`.
      - If Node or the helper is missing, or the helper dies, the
@@ -553,6 +588,13 @@ class Arrow:
       `arr = np.array(xs)`) whose methods share names with repository
       functions;
     - `cls(…)` and `type(self)(…)` in Python;
+    - a Python class with a mixin before its base, and a subclass with
+      its own `__init__`;
+    - an untyped Python parameter passed two different classes;
+    - a class changed by a field, called as `Foo(1)` and `new Foo(1)`;
+    - TypeScript `super(…)` and `new this(…)` inside a changed
+      constructor;
+    - a same-named method on an incompatible TypeScript interface;
     - a TypeScript class with no `implements` clause called through an
       interface;
     - a removed class referred to only in types;

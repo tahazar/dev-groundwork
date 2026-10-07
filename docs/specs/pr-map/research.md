@@ -128,6 +128,25 @@ Added 2026-10-07 after the third design review.
   - TypeScript resolved `Command` from `"commander"` to the import in
     the calling file (C57).
 
+## Addendum for the design: inferred parameters, super, subclasses and assignability
+
+Added 2026-10-07 after the fifth design review.
+
+- **Inferred parameter types.** jedi's settings turn on `dynamic_params`
+  and `dynamic_params_for_other_modules` by default (C58, C59). With them
+  on, `goto` on `obj.save()` for an untyped parameter answered one class's
+  method although two classes are passed in; with them off it answered
+  nothing (C60).
+- **`super` and `new this` in TypeScript.** `getDefinitionAtPosition` on
+  `super(2)` answers the base constructor and its class (C61).
+  `findReferences` on the base constructor found `new this(1)`,
+  `super(2)`, and `new Plain(3)` for a subclass without its own
+  constructor (C62).
+- **Assignability.** TypeScript 5.9.3's type checker declares
+  `isTypeAssignableTo` (C63). It reported a same-named but incompatible
+  class as not assignable to an interface, and a matching one as
+  assignable (C64).
+
 ## Answers to open questions
 
 - Package line above the diagram: deferred to the owner after version 1, as
@@ -504,4 +523,42 @@ Added 2026-10-07 after the third design review.
   source: file:docs/specs/pr-map/spike/results.txt
   tier: 1
   quote: "getDefinitionAtPosition Command (bare specifier, not installed): [ 'use.ts:1:10 alias' ]"
+- id: C58
+  claim: jedi enables dynamic_params by default.
+  source: https://raw.githubusercontent.com/davidhalter/jedi/master/jedi/settings.py
+  tier: 1
+  quote: dynamic_params = True
+  retrieved: 2026-10-07
+- id: C59
+  claim: jedi enables dynamic_params_for_other_modules by default.
+  source: https://raw.githubusercontent.com/davidhalter/jedi/master/jedi/settings.py
+  tier: 1
+  quote: dynamic_params_for_other_modules = True
+  retrieved: 2026-10-07
+- id: C60
+  claim: With dynamic params off, jedi goto on a method call on an untyped parameter answered nothing.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi goto obj.save, dynamic_params=False: []"
+- id: C61
+  claim: getDefinitionAtPosition on super(2) answers the base constructor and its class.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "getDefinitionAtPosition super(2): [ 'lib.ts:4:20 constructor', 'lib.ts:4:14 class' ]"
+- id: C62
+  claim: findReferences on a base constructor found new this, super, and a subclass without its own constructor.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: findReferences Foo constructor: [ 'lib.ts:4:85 "this"', 'lib.ts:5:48 "super"', 'lib.ts:8:45 "Plain"' ]
+- id: C63
+  claim: TypeScript 5.9.3's TypeChecker declares isTypeAssignableTo.
+  source: https://raw.githubusercontent.com/microsoft/TypeScript/v5.9.3/src/compiler/types.ts
+  tier: 1
+  quote: "isTypeAssignableTo(source: Type, target: Type): boolean;"
+  retrieved: 2026-10-07
+- id: C64
+  claim: isTypeAssignableTo reported an incompatible same-named class as not assignable to the interface.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "isTypeAssignableTo(Runner, Task): false"
 ```

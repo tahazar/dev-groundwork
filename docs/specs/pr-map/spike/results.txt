@@ -70,3 +70,17 @@ $ python ctor_py.py ctor-fixture/py
 jedi get_references Foo.__init__: [('lib.py', 2, 8)]
 jedi goto Foo(1): [('lib.py', 1, 6, 'class')]
 jedi goto np.mean: []
+
+# Untyped parameters, super and new this, constructors through subclasses, and assignability (dispatch-fixture/, same versions)
+
+$ python dispatch_py.py dispatch-fixture/py
+jedi goto obj.save, dynamic_params=True: [('lib.py', 2, 'function')]
+jedi goto obj.save, dynamic_params=False: []
+
+$ node dispatch_ts.cjs <typescript> dispatch-fixture/ts
+getDefinitionAtPosition super(2): [ 'lib.ts:4:20 constructor', 'lib.ts:4:14 class' ]
+getDefinitionAtPosition new this: [ 'lib.ts:4:14 parameter', 'lib.ts:4:20 constructor' ]
+getDefinitionAtPosition this(1): [ 'lib.ts:4:14 parameter', 'lib.ts:4:20 constructor' ]
+findReferences Foo constructor: [ 'lib.ts:4:85 "this"', 'lib.ts:5:48 "super"', 'lib.ts:8:45 "Plain"' ]
+isTypeAssignableTo(Runner, Task): false
+isTypeAssignableTo(Shaped, Task): true
