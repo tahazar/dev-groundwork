@@ -152,25 +152,36 @@ and for version 2's AI overlay:
 ```python
 @dataclass(frozen=True)
 class Box:
-    id: str  # "<path>::<qualified name>", e.g. "packages/cli/src/index.ts::run"
-    kind: str  # "function" | "method" | "class" | "module"
+    id: str  # "<path>::<qualified name>", plus "#2", "#3" for repeats in one file
+    kind: str  # "function" | "method" | "class" | "member" | "module"
     name: str  # qualified: "Class.method", "outer.inner"
     path: str  # relative to the repository root
-    line: int  # 1-based line of the name in the commit it is drawn from
+    line: int  # 1-based line of the name
+    column: int  # 0-based character column of the name
     status: str  # "changed" | "added" | "removed" | "neighbour"
 
 
 @dataclass(frozen=True)
 class Arrow:
     source: str  # Box.id of the innermost construct containing the reference
-    target: str  # Box.id of the construct called
+    target: str  # Box.id of the construct referred to
     certainty: str  # "exact" | "possible"
-    at: str  # "<path>:<line>" of the call site
-    reason: str  # for "possible": "unresolved", "several definitions", "resolver failed: <why>"
+    at: str  # "<path>:<line>:<column>" of the reference site
+    reason: str  # for "possible": "unresolved", "through <box>", "resolver failed: <why>"
 ```
 
-A call at module level, outside any construct, gets a `module` box named
-after its file, so a top-level caller is not lost.
+- **`member`** covers what has a name and a body or type but is not a
+  function or class: interface and abstract method signatures, property
+  signatures, and class fields that hold an arrow function. The queries
+  capture `method_signature`, `abstract_method_signature`,
+  `property_signature` and `public_field_definition` for TypeScript.
+- **Repeated names in one file** get `#2`, `#3` in source order. Examples
+  are a Python `@property` getter and its setter, or a function defined
+  in both branches of an `if`. Classification pairs them by ordinal, so
+  inserting a new repeat above an old one can show as one changed box
+  plus one added box; the arrows stay right.
+- **A reference at module level**, outside any construct, gets a `module`
+  box named after its file, so a top-level caller is not lost.
 
 ### Pipeline
 
@@ -182,7 +193,8 @@ after its file, so a top-level caller is not lost.
 2. **Constructs.**
    - Each changed file is parsed at both commits: the head version from
      the working tree, the base version from `git show <base>:<path>`.
-   - A construct's identity is its path and qualified name.
+   - A construct's identity is its path, qualified name and, for repeats,
+     its ordinal (see the data model).
 3. **Classify** (AC-1 to AC-3, AC-10). Hunk line ranges come from
    `diff_against(root, base, "-U0", "--", path)`.
    - **changed:** the construct is in both commits, and its head span
@@ -202,80 +214,104 @@ after its file, so a top-level caller is not lost.
      reference.
    - So one edit produces one changed box, and every arrow is drawn once.
 5. **Candidates.** A candidate is a place in the code that may refer to a
-   box. There are two sources, and the candidates are their union:
+   box. There are three sources, and the candidates are their union:
    - **Name matches from tree-sitter.** Every identifier whose text
-     equals a box's name: calls, but also functions passed as values
+     equals the last segment of a box's name (`m` for `C.m`). In
+     TypeScript that includes `identifier`, `property_identifier` and
+     shorthand properties; in Python, identifiers and attribute names.
+     This covers calls, but also functions passed as values
      (`.action(runX)`, `key=fn`, `{ run: cmdRun }`). Scanning the whole
      repository took under 0.3 s (C10, C10b).
-   - **The resolver's reference search.** For each changed or added box:
-     - TypeScript `findReferences` (C13), run in every LanguageService
-       whose program includes the box's file;
-     - jedi `get_references` (C16, C17b).
-
-     This adds what a name match cannot see: aliased imports (`import {
-     readClip as rc }`), default exports imported under another name,
-     and `from report import save_record as save`.
+   - **The resolver's reference search**, for each changed or added box:
+     - TypeScript `findReferences` (C13). It follows renamed imports,
+       default imports under another name, and calls made through an
+       interface two levels above the box (C43, C44, C45).
+     - jedi `get_references` (C16, C17b). It finds a renamed import but
+       not the calls through it (C46), so pr-map follows aliases itself
+       (next point).
+   - **Aliases.** When a reference site from either source is the name in
+     an import that renames it (`as save`, `{ readClip as rc }`), the new
+     name's identifiers in that file become candidates too.
 
    Candidates, by role:
-   - **Callers of a changed or added box:** both sources, for its name.
+   - **Callers of a changed or added box:** all three sources.
    - **Callees of a changed or added box:** identifiers inside its own
      span.
-   - **Callers of a removed box:** name matches in the head commit. The
-     resolver cannot search for a definition that no longer exists.
-6. **Verdicts** (AC-4 to AC-7). `definition_at` answers each candidate.
-   An answer is a list of locations; it is turned into a verdict like
-   this:
-   - **It counts as a box** only when the location is the name position
-     of a construct the tags query found. Several locations inside one
-     construct, such as TypeScript overloads, count as that one box.
-   - **A local variable or parameter** in the repository (`const fn =
-     pick(); fn()`) is not a box.
-   - **An import statement** means the import did not resolve, because
-     the project's dependencies are not installed.
+   - **Callers of a removed box:** name matches and aliases in the head
+     commit. The resolver cannot search for a definition that no longer
+     exists.
+6. **Verdicts** (AC-4 to AC-7). `definition_at(path, line, column)`
+   answers each candidate with a list of locations. Each location has a
+   file, line and column; TypeScript answers also carry their
+   `DefinitionInfo.kind`.
+   - **A location is a box** only when its line *and* column are the
+     name position of a construct the tags query found. A parameter or a
+     local declared on the same line as a function's name is therefore
+     never mistaken for the function.
+   - **Several locations inside one construct**, such as TypeScript
+     overloads, count as that one box.
+   - **Related box:** another box is related to the target T when one of
+     these holds:
+     - **TypeScript:** the candidate came from T's own `findReferences`.
+       The compiler links it to T through renames, interfaces and base
+       classes (C43 to C45).
+     - **Python:** the box is a member with T's name in a class that T's
+       class inherits from, directly or further up. Each base-class name
+       is resolved with `goto` (C41), not matched by text. The same holds
+       for a member of a `Protocol` class with T's name, since a protocol
+       is matched by shape, not by inheritance.
 
    | Answer | Caller candidate for box T | Callee candidate | Removed box R |
    |---|---|---|---|
-   | T | exact arrow | (T calls itself) exact arrow | not possible (R is gone) |
-   | Another box that T overrides or implements: a member with T's name in a class or interface that T's class extends or implements, by the heritage clause | possible arrow, reason "through `<that box>`" | exact arrow to that box | no arrow |
-   | Another box | no arrow | exact arrow to that box | no arrow |
-   | A local variable, parameter, or a definition outside the repository | no arrow | no arrow: boxes are constructs in the repository | no arrow |
-   | An unresolved import | possible arrow, reason "unresolved import" | possible arrow, but only when exactly one repository box has that name; otherwise listed as an unresolved call, without arrows | possible arrow, reason "unresolved" |
-   | Nothing, or several boxes | possible arrow | as for an unresolved import | possible arrow, reason "unresolved" |
+   | T | exact arrow | exact arrow (T calls itself) | not possible (R is gone) |
+   | A related box | possible arrow, reason "through `<that box>`" | exact arrow to that box | no arrow |
+   | Another box, unrelated | no arrow | exact arrow to that box | no arrow |
+   | A local variable or parameter | no arrow | no arrow | no arrow |
+   | Another repository definition that is not a box (for example an attribute set in `__init__`) | possible arrow, reason "through `<path:line>`" | as for an unresolved import | possible arrow, reason "unresolved" |
+   | A definition outside the repository (library, standard library) | no arrow | no arrow: boxes are constructs in the repository | no arrow |
+   | An unresolved import (the project's dependencies are not installed) | possible arrow, reason "unresolved import" | possible arrow, only when exactly one repository box has that name; otherwise listed as an unresolved call without arrows | possible arrow, reason "unresolved" |
+   | Nothing, or several unrelated boxes | possible arrow | as for an unresolved import | possible arrow, reason "unresolved" |
    | Resolver failed | possible arrow, reason "resolver failed: …" | as for an unresolved import | same |
 
    What this guarantees:
-   - **A solid arrow** is always a resolver answer naming that exact box
-     (AC-5).
-   - **A dashed arrow** is always a real reference site whose name
-     equals its target, and whose target the resolver could not rule
-     out (AC-6, AC-7).
-   - **A caller is only ever dropped** when the resolver positively names
-     a different, unrelated definition.
-   - **jedi stopping early (C24)** cannot drop a caller: the name-match
-     source still produces the candidate.
-   - **A call on a base type or interface**, where the box is an override
-     or implementation, stays visible as a dashed arrow.
+   - **A solid arrow** is always a resolver answer whose location is that
+     exact box's name position (AC-5).
+   - **A dashed arrow** is always a real reference site whose name, or
+     alias, matches its target, and whose target the resolver could not
+     rule out (AC-6, AC-7).
+   - **A caller is dropped only** when the resolver names a local, a
+     library definition, or a box unrelated to the target. A relation
+     through a rename, an interface, a base class or a protocol keeps it
+     as a dashed arrow.
+   - **jedi stopping early (C24)** cannot drop a caller: name matches and
+     aliases still produce the candidate.
 
-   An unresolved call with several possible repository targets is listed
-   in the text section rather than fanned out to every same-named box, so
-   that `d.get()` on an untyped value does not draw an arrow to every
+   An unresolved callee with several possible repository targets is
+   listed in the text section rather than fanned out to every same-named
+   box. So `d.get()` on an untyped value does not draw an arrow to every
    `get` in the repository.
 7. **Resolvers.**
    - **Python.** One `jedi.Project` per nearest directory with
      `pyproject.toml`, `setup.cfg` or `setup.py`, else the repository
-     root. `Script.goto(line, column, follow_imports=True)` (C41).
-     Columns are converted from tree-sitter's bytes to characters.
+     root. `Script.goto(line, column, follow_imports=True)` (C41), and
+     `get_references` (C17b). Columns are converted from tree-sitter's
+     bytes to characters. jedi answers carry line and column.
    - **TypeScript.** `resolve_ts.cjs` loads the pinned typescript and
      keeps one LanguageService per nearest `tsconfig.json` (default
-     options when there is none). Its compiler options add `paths`
-     entries for each workspace package: the `name` in its
-     `package.json`, mapped from the `types` entry under the package's
-     `outDir` to the same path under its `rootDir` (C38 to C40). The
-     project's own `paths` win when both name a package.
+     options when there is none).
+     - A file the tsconfig does not include, such as a test directory
+       outside `include`, is added to that LanguageService's root files
+       when it is queried, so its references resolve.
+     - Its compiler options add `paths` entries for each workspace
+       package: the `name` in its `package.json`, mapped from the `types`
+       entry under the package's `outDir` to the same path under its
+       `rootDir` (C38 to C40). The project's own `paths` win when both
+       name a package.
      - Protocol: one JSON object per line. Requests are
-       `{"id", "file", "line", "column"}`, with UTF-16 columns converted
-       in Python. Answers are `{"id", "definitions": [{"file", "line"}]}`
-       or `{"id", "error"}`.
+       `{"id", "op": "definition" | "references", "file", "line",
+       "column"}`, with columns in UTF-16 code units, converted in
+       Python. Answers are `{"id", "locations": [{"file", "line",
+       "column", "kind"}]}` or `{"id", "error"}`.
      - If Node or the helper is missing, or the helper dies, the
        TypeScript candidates fall back to possible arrows with that
        reason. The comment says so, and a warning is logged. This is the
@@ -341,24 +377,28 @@ after its file, so a top-level caller is not lost.
    - Without `--post` (a contributor running it locally), a missing
      `--base` or git exits 2. With `--post` it posts the problem and
      exits 0, like any other failure (AC-20, AC-21).
-   - In the workflow, the install steps record a failure in a file
-     instead of failing the step. `pr_map.py` reports that failure in the
-     comment. So no step of the job fails because of the map (AC-21),
-     without relying on `continue-on-error` semantics research did not
-     cover.
+   - In the workflow, the install and upload steps use
+     `continue-on-error` (C47), and `pr_map.py` reports a missing package
+     in the comment. See the workflow template below (AC-21).
 
 ### Workflow template: `templates/ci/pr-map.yml`
 
 - Trigger: `pull_request`.
 - Permissions: `contents: read`, `pull-requests: write`.
 - Concurrency: group `pr-map-${{ github.event.pull_request.number }}`
-  with `cancel-in-progress: false`. A second run on the same pull request
-  waits for the first, then finds and edits the first run's comment, so
-  two quick pushes cannot create two comments (AC-16). Runs wait rather
-  than cancel, so no check ever shows as cancelled.
+  with `cancel-in-progress: false`.
+  - At most one run per pull request is in progress at a time, so a
+    second run always finds and edits the first run's comment. Two quick
+    pushes cannot create two comments (AC-16).
+  - A newer run cancels one that is still pending (C48). That run's check
+    shows as cancelled, not failed, and the newest run still posts the
+    up-to-date map.
 - Steps, each action pinned to a commit SHA (rule 12):
   1. `actions/checkout`, the pin already in `templates/ci/groundwork.yml`,
-     with `fetch-depth: 0`;
+     with `fetch-depth: 0` and `ref: ${{ github.event.pull_request.head.sha }}`.
+     That checks out the pull request's own head commit instead of
+     GitHub's merge commit (C49), so the header's head SHA is a commit on
+     the pull request (AC-17);
   2. `actions/setup-python`, the pin already in `.github/workflows/ci.yml`,
      Python 3.12;
   3. `actions/setup-node` v7.0.0 at `820762786026740c76f36085b0efc47a31fe5020`,
@@ -370,6 +410,14 @@ after its file, so a top-level caller is not lost.
   7. `actions/upload-artifact`, uploading the `pr-map` artifact. The pin
      comes from the action's release tags when the template is written
      (the latest tag on 2026-10-07 was v7.0.2).
+- Every step that installs, downloads or uploads (steps 2 to 5 and 7)
+  sets `continue-on-error: true`, which keeps the job from failing when
+  that step fails (C47).
+  - An install failure leaves pr-map to report the missing package in the
+    comment.
+  - An upload failure loses only the artifact; the comment and the
+    summary still say where the map is.
+  - So the map never fails the pull request's checks (AC-21).
 - The project's own dependencies are not installed. Calls into libraries
   are not drawn anyway, and repository code resolves without them (C40).
 
@@ -389,10 +437,16 @@ after its file, so a top-level caller is not lost.
     - **an exact arrow** must match a site and its true target;
     - **a possible arrow** must match a site whose true target is that
       box, or one marked "uncertain" whose name is that box's.
-  - The fixtures also cover each case the verdicts distinguish: aliased
-    and default imports, a function passed as a value, a call through an
-    interface or base class, a local variable, an unresolved import,
-    nested constructs and overloads.
+  - The fixtures also cover each case the verdicts distinguish:
+    - renamed and default imports, in both languages;
+    - a function passed as a value;
+    - a call through an interface two levels up, an object literal typed
+      by an interface, a Python base class two levels up, and a
+      `Protocol`;
+    - a parameter declared on its function's name line and then called;
+    - a local variable, and an unresolved import;
+    - nested constructs, overloads, and repeated names in one file;
+    - a test file outside its tsconfig's `include`.
 - **GitHub API.** A local HTTP server implements the issue comment
   endpoints, with modes for 403 and 422. It fakes a process boundary
   (rule 5); no mocks.
@@ -417,11 +471,11 @@ after its file, so a top-level caller is not lost.
 | AC-14 | 422 retries with smaller bodies and a link; the complete map always in the summary or artifact |
 | AC-15 | Workflow on `pull_request` (opened and new commits) |
 | AC-16 | Marker comment by `github-actions[bot]`, edited in place; runs on one pull request queue |
-| AC-17 | Header with base and head short SHAs |
+| AC-17 | Header with the merge-base and pull request head short SHAs; the workflow checks out the head commit (C49) |
 | AC-18 | Fork or 403: job summary only, with the reason |
 | AC-19 | Unreadable files listed; files with syntax errors mapped partially and listed |
 | AC-20 | Top-level catch posts the error |
-| AC-21 | Exit 0 on map failures; install failures recorded, not fatal |
+| AC-21 | Exit 0 on map failures; `continue-on-error` on every install, download and upload step (C47) |
 | AC-22 | Deferred, as the requirements say. Setup gains a copy of `scripts/pr_map/` and the template after the trial in one project |
 
 ## Project rules check
