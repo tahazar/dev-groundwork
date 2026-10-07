@@ -19,6 +19,7 @@ sys.path.insert(0, str(SCRIPTS))
 import check_ac_coverage  # noqa: E402
 import check_citations  # noqa: E402
 import detect_workarounds  # noqa: E402
+import hook_commit_gate  # noqa: E402
 import hook_guard_tests  # noqa: E402
 from groundwork_config import glob_match, load_config  # noqa: E402
 
@@ -264,6 +265,72 @@ class WorkaroundTests(unittest.TestCase):
         )
         code, out = self.run_detect()
         self.assertEqual(code, 0, out)
+
+
+class CommitGateTests(unittest.TestCase):
+    """The gate runs `onCommit` before `git commit`; the check here is a marker-file test."""
+
+    def setUp(self):
+        # The check fails while `broken` exists, and counts its runs in `runs.log`.
+        self.repo = Repo({"onCommit": "echo run >> runs.log && test ! -e broken"})
+        self.repo.write(".gitignore", "runs.log\n.groundwork/state/\n")
+        self.repo.write("src/a.py", "a = 1\n")
+        self.repo.commit("base")
+        self.config = load_config(self.repo.root)
+
+    def tearDown(self):
+        self.repo.close()
+
+    def gate(self, command: str = "git add -A && git commit -m x") -> str | None:
+        return hook_commit_gate.gate(command, self.repo.root, self.config)
+
+    def runs(self) -> int:
+        log = self.repo.root / "runs.log"
+        return len(log.read_text().splitlines()) if log.exists() else 0
+
+    def test_failing_check_blocks_commit(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.write("broken", "")
+        reason = self.gate()
+        self.assertIsNotNone(reason)
+        self.assertIn("commit was not made", reason)
+
+    def test_passing_check_allows_and_is_cached(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.assertIsNone(self.gate())
+        self.assertIsNone(self.gate())
+        self.assertEqual(self.runs(), 1)
+        self.repo.write("src/a.py", "a = 3\n")
+        self.assertIsNone(self.gate())
+        self.assertEqual(self.runs(), 2)
+
+    def test_other_commands_do_not_run_checks(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.write("broken", "")
+        for command in ("git status", "git log --grep commit", "echo git commit-tree", "pnpm test"):
+            self.assertIsNone(self.gate(command), command)
+        self.assertEqual(self.runs(), 0)
+
+    def test_commit_with_global_options_is_gated(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.write("broken", "")
+        self.assertIsNotNone(self.gate("git -C . commit -m x"))
+        self.assertIsNotNone(self.gate("cd src; git -c user.name=x commit -am y"))
+
+    def test_docs_only_change_skips_checks(self):
+        self.repo.write("docs/notes.md", "text\n")
+        self.repo.write("broken", "")
+        self.repo.write(".gitignore", "runs.log\n.groundwork/state/\nbroken\n")
+        self.repo.commit("ignore marker")
+        self.repo.write("docs/notes.md", "more text\n")
+        self.assertIsNone(self.gate())
+        self.assertEqual(self.runs(), 0)
+
+    def test_no_check_configured_allows(self):
+        self.config["onCommit"] = None
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.write("broken", "")
+        self.assertIsNone(self.gate())
 
 
 class GuardTests(unittest.TestCase):

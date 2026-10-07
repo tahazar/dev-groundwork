@@ -26,9 +26,9 @@ wrong and why; do not work around it.
   changing the design is the user's decision.
 - Reuse what research.md lists. Before adding a helper, search for an
   existing one.
-- The plugin runs the project's per-file checks after each edit and its
-  full checks before you stop. Fix what they report at the cause. Do not
-  add suppressions, skips or lowered thresholds.
+- Commit in small steps. The plugin runs the project's checks when you
+  commit and blocks the commit if they fail. Fix what they report at the
+  cause. Do not add suppressions, skips or lowered thresholds.
 
 ## 3. Finish the task
 

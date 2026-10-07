@@ -10,29 +10,15 @@
             "timeout": 10
           }
         ]
-      }
-    ],
-    "PostToolUse": [
+      },
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/scripts/hook_post_edit.py",
-            "timeout": 180,
-            "statusMessage": "Running per-file checks"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/scripts/hook_stop.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/scripts/hook_commit_gate.py",
             "timeout": 900,
-            "statusMessage": "Running project checks"
+            "statusMessage": "Running project checks before commit"
           }
         ]
       }

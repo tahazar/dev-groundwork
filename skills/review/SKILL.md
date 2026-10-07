@@ -17,7 +17,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/detect_workarounds.py --base <base>
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check_ac_coverage.py $feature
 ```
 
-Run the project's full checks too (the `onStop` command in
+Run the project's full checks too (the `onCommit` command in
 `.groundwork/config.json`). Each failure is blocking.
 
 ## 2. Fresh-context review

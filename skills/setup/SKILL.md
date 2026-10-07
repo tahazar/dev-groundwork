@@ -15,9 +15,9 @@ Read the build and test setup before asking anything: `package.json`,
 `pyproject.toml`, `Makefile`, CI workflows, `CONTRIBUTING.md`, existing
 `CLAUDE.md`, and any review guide. Find:
 
-- the command that formats and lints one file, per language;
-- the commands that typecheck and test the project (fast enough to run
-  before every stop; under a few minutes);
+- the commands that check formatting, lint, typecheck and test the
+  project, fast enough to run before every commit (a few minutes at most;
+  split slow suites so they run only when their part of the tree changed);
 - where tests live;
 - where design documents live today, if anywhere.
 
@@ -28,9 +28,9 @@ Start from `${CLAUDE_PLUGIN_ROOT}/templates/config.json` and fill in:
 - `specDir`: where feature specs go. Default `docs/specs`; use an existing
   design-doc directory if the project has one.
 - `testGlobs`: globs that match test files and nothing else.
-- `onEdit`: one rule per language, `{"glob": "**/*.ts", "run": "<format and lint {file}>"}`.
-  `{file}` is the edited path. Only per-file commands belong here.
-- `onStop`: the typecheck and test command, joined with `&&`.
+- `onCommit`: the format check, lint, typecheck and test commands, joined
+  with `&&`, or a script that runs them. It runs before each commit Claude
+  makes and blocks the commit on failure.
 - `sources.tier1` and `sources.tier2`: domains for this project's stack.
   Tier 1 is official documentation, standards bodies, and the source hosts
   of libraries the project uses (for example `docs.python.org`,
@@ -74,5 +74,6 @@ Project rules: `.groundwork/project-rules.md`.
 ## 5. Check it works
 
 - `python3 .groundwork/bin/detect_workarounds.py --base origin/<default branch>` runs.
-- Edit a source file and confirm the `onEdit` command runs.
+- Run the `onCommit` command once by hand and confirm it passes on the
+  current tree.
 - Report what was set up and what the user still needs to decide.

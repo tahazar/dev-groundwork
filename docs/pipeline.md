@@ -9,7 +9,7 @@ Work does not start on a stage until the gate before it passes.
 | 2. Research | `/dev-groundwork:research` | `research.md` | `check_citations.py` passes; every open question is answered or deferred |
 | 3. Design | `/dev-groundwork:design` | `design.md`, `tasks.md` | `design-reviewer` finds nothing blocking; you approve |
 | 4. Tests | `/dev-groundwork:acceptance-tests` | Failing tests, one or more per criterion | `check_ac_coverage.py` passes; you review the tests |
-| 5. Implement | `/dev-groundwork:implement` | Code, one task per session | Hooks: format and lint per edit, project checks before stopping, test files locked |
+| 5. Implement | `/dev-groundwork:implement` | Code, one task per session | Hooks: project checks before each commit, test files locked |
 | 6. Review | `/dev-groundwork:review` | Findings | `code-reviewer` finds nothing blocking; `detect_workarounds.py` and CI pass |
 
 Spec files live in `<specDir>/<feature>/` (default `docs/specs/<feature>/`).
@@ -58,8 +58,17 @@ itself against can share its mistakes. The tests are reviewed by you,
 traced to criteria by a script, and locked while implementation runs.
 
 **Hooks, not instructions, for rules that must always hold.** Instructions
-in CLAUDE.md are advisory; hooks run every time [1]. Formatting, linting,
-the project's checks and the test lock are hooks.
+in CLAUDE.md are advisory; hooks run every time [1]. The project's checks
+and the test lock are hooks.
+
+**Check at the commit, not on every edit.** Code is often half-finished in
+the middle of a change: an import before its use, a rename before its
+callers. Linting every intermediate state pushes the agent to fix or
+silence warnings that would have resolved on their own. The checks run
+when Claude commits instead, and a failure blocks the commit. With small,
+frequent commits that is still often, and a failure caught there costs a
+local run instead of a red CI cycle. CI runs the same checks on every push
+and stays the source of truth.
 
 **Review happens in a fresh context.** A reviewer that did not write the
 code is not anchored on the author's reasoning [1]. A reviewer asked to find
