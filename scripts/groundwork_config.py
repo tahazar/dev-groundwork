@@ -27,8 +27,7 @@ DEFAULTS: dict = {
         "**/*_test.*",
         "**/test_*.py",
     ],
-    "onEdit": [],
-    "onStop": None,
+    "onCommit": None,
     "sources": {"tier1": [], "tier2": []},
     "workarounds": {"ignorePaths": [], "extraPatterns": []},
 }

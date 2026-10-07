@@ -45,8 +45,7 @@ Skip the first three for a change you can describe in one sentence.
 | Mechanism | Enforces |
 |---|---|
 | `PreToolUse` hook | While `.groundwork/state/tests-locked` exists, edits to test files are denied, and only you can remove the lock |
-| `PostToolUse` hook | The project's per-file format and lint commands run after every edit |
-| `Stop` hook | The project's typecheck and test command runs before Claude ends a turn that changed code |
+| `PreToolUse` hook on `git commit` | The project's checks (`onCommit`: format, lint, typecheck, tests) pass before Claude commits code; a failure blocks the commit |
 | `check_citations.py` | Each cited quote appears at its source, the source's domain supports the claimed tier, and Tier 3 sources are only pointers |
 | `check_ac_coverage.py` | Every approved acceptance criterion has a tagged test, and no test cites a criterion that does not exist |
 | `detect_workarounds.py` | No new test skips, lint or type suppressions, coverage exclusions, threshold edits or deleted tests without a `groundwork-allow: <reason>` |
@@ -66,8 +65,15 @@ does not need the plugin installed.
 - `check_citations.py` reads HTML and plain text. PDFs and pages rendered by
   JavaScript need a manual check recorded with `override: <reason>`, and
   every override is listed in the report.
-- The Stop hook steps aside when `stop_hook_active` is set, so a failing
-  check blocks one stop per chain instead of looping.
+- The commit check runs on the working tree, not the staged snapshot, so
+  it can pass on changes that are not all in the commit. CI checks the
+  commit itself.
+- Checks run at the commit, not after every edit. Mid-change code is often
+  half-finished, and checking every intermediate state pushes the agent to
+  silence warnings that would have resolved on their own. With small,
+  frequent commits the gate still runs often.
+- Cloud sessions do not load plugins from repository settings, so there
+  the hooks do not run and CI is the only gate.
 - `detect_workarounds.py` reads `git diff`, so it does not see untracked
   files. Commit or stage new files before running it locally; CI always
   sees them.

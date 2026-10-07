@@ -1,8 +1,7 @@
 {
   "specDir": "docs/specs",
   "testGlobs": ["**/test/**", "**/tests/**", "**/*.test.*", "**/*.spec.*", "**/test_*.py"],
-  "onEdit": [],
-  "onStop": null,
+  "onCommit": null,
   "sources": {
     "tier1": [],
     "tier2": []
