@@ -1,0 +1,13 @@
+[project]
+name = "dev-groundwork"
+version = "0.1.0"
+description = "Check scripts and hooks for the dev-groundwork Claude Code plugin."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "RUF", "PIE", "PLW1510", "BLE"]
