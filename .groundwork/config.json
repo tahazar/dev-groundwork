@@ -3,7 +3,7 @@
   "testGlobs": ["tests/**"],
   "onCommit": "ruff check . && ruff format --check . && python3 -m unittest discover tests -q",
   "sources": {
-    "tier1": ["code.claude.com", "docs.anthropic.com", "www.anthropic.com", "github.com", "docs.python.org"],
+    "tier1": ["code.claude.com", "docs.anthropic.com", "www.anthropic.com", "github.com", "raw.githubusercontent.com", "docs.python.org"],
     "tier2": []
   },
   "workarounds": {
