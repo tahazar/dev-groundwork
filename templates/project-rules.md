@@ -20,5 +20,8 @@ needs a written justification in the design's "Project rules check".
 8. **Sources are tiered.** A decision rests on a Tier 1 source, or a
    Tier 2 source with the gap stated. "Unverified" is an acceptable answer;
    a made-up source is not.
+9. **Evidence before claims.** "Passes", "fixed" and "done" are said only
+   after running the command that shows it, in the same session. A bug
+   fix's test is shown failing without the fix.
 
 <Add project-specific rules below: boundaries, licensing, performance limits.>

@@ -26,14 +26,21 @@ wrong and why; do not work around it.
   changing the design is the user's decision.
 - Reuse what research.md lists. Before adding a helper, search for an
   existing one.
+- Work one tagged test at a time: run it and confirm it fails for the
+  expected reason, write the least code that makes it pass, then clean up
+  with everything still green. The approved tests are the red step; the
+  lock keeps them fixed.
 - Commit in small steps. The plugin runs the project's checks when you
   commit and blocks the commit if they fail. Fix what they report at the
   cause. Do not add suppressions, skips or lowered thresholds.
+- When something fails for a reason you do not understand, use
+  `/dev-groundwork:debug` before changing code.
 
 ## 3. Finish the task
 
-- Run the tagged tests for the criteria this task covers and show the
-  output.
+- Run the tagged tests for the criteria this task covers and the full
+  project checks, in this session, and show the output. A claim that they
+  pass needs that output.
 - Tick the task in tasks.md.
 - Commit with a message that names the task and criteria.
 - Tell the user the task is done and that the next task should start in a

@@ -40,6 +40,10 @@ Do not give it this conversation or your reasoning about the change.
 
 ## 4. Gate
 
+Every claim in the report rests on a command run in this session: quote
+the result (exit code, test counts), not "should pass". A subagent's
+"done" is checked against the diff before it is repeated.
+
 Report: check results, each blocking finding and what was done, and any
 `groundwork-allow` reasons the workaround check printed. When everything
 passes, tell the user they can remove the test lock
