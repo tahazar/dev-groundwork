@@ -190,7 +190,11 @@ class Arrow:
    - Changed files come from `diff_against(root, base, "--name-status",
      "-M")`, filtered to `.ts`, `.tsx` and `.py` outside the skip list.
      `-M` pairs renamed files.
-2. **Constructs.**
+2. **Constructs.** Constructs are needed for every source file in the
+   head tree, not only the changed ones: a callee's answer or a related
+   box is matched by its name position anywhere in the repository. The
+   whole-repository scan took under 0.3 s (C10, C10b), and its result is
+   reused for the name matches in step 5.
    - Each changed file is parsed at both commits: the head version from
      the working tree, the base version from `git show <base>:<path>`.
    - A construct's identity is its path, qualified name and, for repeats,
@@ -223,7 +227,12 @@ class Arrow:
        Python, `constructor` in TypeScript) uses its class's name as its
        match key, because a call reads `Foo(1)` or `new Foo(1)`, never
        `__init__`. jedi's reference search does not find those calls
-       either (C50).
+       either (C50). In Python, the names of subclasses that define no
+       `__init__` or `__new__` of their own are match keys too, followed
+       down the hierarchy, because `Baz(3)` runs `Foo.__init__` when
+       `Baz(Foo)` does not override it. Each subclass's base names are
+       resolved with `goto` (C41). TypeScript's `findReferences` on the
+       constructor already finds `new Baz(3)` and `super(…)`.
      - **Node kinds.** In TypeScript the kinds are `identifier`,
        `property_identifier`, `shorthand_property_identifier` and
        `type_identifier`, the last so that type-only uses (`x: R`,
@@ -268,9 +277,21 @@ class Arrow:
      at any of their names is that box.
    - **A class with its constructor.** A call of a class resolves to the
      class in Python (C51), and to both the class and its constructor in
-     TypeScript (C52). Either answer counts as the constructor box when T
-     is the constructor, and as the class box when T is the class. Both
-     are what the call runs.
+     TypeScript (C52). Only a real call counts as a call of the
+     constructor:
+     - **TypeScript:** the answer counts as the constructor box only when
+       it includes the constructor's own location. `new Foo` and
+       `super(…)` do; a type annotation or `Foo.make()` answers with the
+       class alone and counts as the class.
+     - **Python:** a class answer counts as `__init__` or `__new__` only
+       when the identifier is the function of a call node (`Foo(1)`,
+       `Baz(3)` for a subclass without its own constructor). An
+       annotation, `Foo.make()` and `isinstance(x, Foo)` count as the
+       class.
+     - **Removed constructors** never match a class answer: the call no
+       longer runs them.
+     - **A callee `new Foo()`** is one arrow, to the constructor box
+       when the class defines one, else to the class box.
    - **Library calls are recognised before anything is drawn.** Without
      the project's dependencies, a library call does not resolve to the
      library: jedi answers nothing (C56) and TypeScript answers the import
@@ -291,10 +312,14 @@ class Arrow:
      - **TypeScript:** the candidate came from T's own `findReferences`.
        The compiler links it to T through renames, interfaces, base
        classes and typed object literals (C43 to C45, C54).
-     - **TypeScript, structural:** the box is an interface member with
-       T's name. TypeScript matches classes to interfaces by shape, so a
-       class with no `implements` clause can still be called through the
-       interface, and `findReferences` on T would not link them.
+     - **TypeScript, structural:** T is a method, and the box is an
+       interface method signature, or a property signature with a
+       function type, with T's name. TypeScript matches classes to
+       interfaces by shape, so a class with no `implements` clause can
+       still be called through the interface, and `findReferences` on T
+       would not link them. A plain data property with T's name is not
+       related: `c.notes` on `interface Clip { notes: number[] }` says
+       nothing about a function `notes()`.
      - **Python:** the box is a member with T's name in a class that T's
        class inherits from, directly or further up. Each base-class name
        is resolved with `goto` (C41), not matched by text. The same holds
@@ -307,7 +332,7 @@ class Arrow:
    | A related box | possible arrow, reason "through `<that box>`" | exact arrow to that box | no arrow |
    | Another box, unrelated | no arrow | exact arrow to that box | no arrow |
    | A local variable or parameter | no arrow | no arrow | no arrow |
-   | Another repository definition that is not a box (for example an attribute set in `__init__`) | possible arrow, reason "through `<path:line>`" | as for an unresolved import | possible arrow, reason "unresolved" |
+   | Another repository definition that is not a box (an attribute set in `__init__`, an untyped object's property) | no arrow; the site is listed in the text section as "refers to `<path:line>`" | same | no arrow |
    | A definition outside the repository (library, standard library) | no arrow | no arrow: boxes are constructs in the repository | no arrow |
    | A library import (traced as above) | no arrow, counted as a library call | no arrow, counted as a library call | no arrow |
    | An import of a repository module that did not resolve | possible arrow, reason "unresolved import" | possible arrow, only when exactly one repository box has that name; otherwise listed as an unresolved call without arrows | possible arrow, reason "unresolved" |
@@ -320,10 +345,14 @@ class Arrow:
    - **A dashed arrow** is always a real reference site whose name, or
      alias, matches its target, and whose target the resolver could not
      rule out (AC-6, AC-7).
-   - **A caller is dropped only** when the resolver names a local or a box
-     unrelated to the target, or when its name traces to a library import
-     (then it is counted, not shown). A relation through a rename, an
-     interface, a base class or a protocol keeps it as a dashed arrow.
+   - **A caller is dropped from the diagram only** when the resolver names
+     a local or a box unrelated to the target, or a definition that is not
+     a box (listed in the text), or when its name traces to a library
+     import (counted). A relation through a rename, an interface method, a
+     base class or a protocol keeps it as a dashed arrow. Real flows of a
+     function through a property (`{ run }`, `{ run: cmdRun }`) are still
+     found: by `findReferences` in TypeScript, and in both languages by
+     the name match where the function is assigned.
    - **A library call never draws an arrow** to a same-named repository
      function, so `np.mean(xs)` does not point at the repository's own
      `mean` (AC-7).
@@ -502,7 +531,12 @@ class Arrow:
     - a library import whose name equals a repository function
       (`np.mean` next to a repository `mean`), with the library not
       installed;
-    - constructors in both languages, called as `Foo(1)` and `new Foo(1)`;
+    - constructors in both languages, called as `Foo(1)` and `new Foo(1)`,
+      through a Python subclass without its own `__init__`, and next to
+      non-calls of the class: an annotation, `Foo.make()` and
+      `isinstance(x, Foo)`;
+    - a function next to a same-named interface data property and an
+      untyped object key (`notes()` beside `c.notes`);
     - a TypeScript class with no `implements` clause called through an
       interface;
     - a removed class referred to only in types;
