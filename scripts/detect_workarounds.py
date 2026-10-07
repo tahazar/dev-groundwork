@@ -14,7 +14,9 @@ Markdown and other prose files are skipped, since documentation names these
 patterns without using them.
 
 A flagged line passes when it carries `groundwork-allow: <reason>`; the
-reason is printed so a reviewer can judge it.
+reason is printed so a reviewer can judge it. A removed threshold line cannot
+carry the marker, so it passes when the same file adds a threshold line that
+does.
 
 Exit status: 0 when nothing unallowed is found, 1 otherwise, 2 on errors.
 """
@@ -82,7 +84,29 @@ def scan_diff(diff: str, ignore: list[str], extra: dict[str, str]) -> list[tuple
             if re.search(pattern, body):
                 allow = ALLOW.search(body)
                 findings.append((kind, current, f"{sign} {body.strip()}", allow.group(1) if allow else None))
-    return findings
+    return allow_replaced_thresholds(findings)
+
+
+def allow_replaced_thresholds(
+    findings: list[tuple[str, str, str, str | None]],
+) -> list[tuple[str, str, str, str | None]]:
+    """Let a threshold line's reason cover the old line it replaces.
+
+    A removed line cannot carry `groundwork-allow`, so a re-based threshold
+    would otherwise always fail. When a file adds a threshold line with a
+    reason, that reason also covers the threshold lines the file removes. A
+    removal with no allowed replacement is still flagged.
+    """
+    reasons: dict[str, str] = {}
+    for kind, path, text, allow in findings:
+        if kind.startswith("threshold-change") and text.startswith("+") and allow and path not in reasons:
+            reasons[path] = allow
+    return [
+        (kind, path, text, reasons[path])
+        if allow is None and kind.startswith("threshold-change") and text.startswith("-") and path in reasons
+        else (kind, path, text, allow)
+        for kind, path, text, allow in findings
+    ]
 
 
 def deleted_tests(root: Path, base: str, test_globs: list[str]) -> list[str]:

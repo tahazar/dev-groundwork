@@ -254,6 +254,27 @@ class WorkaroundTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("threshold-change-metric", out)
 
+    def test_rebased_threshold_with_reason_passes(self):
+        self.repo.write(
+            "vitest.config.ts", "thresholds: { lines: 80 }, // groundwork-allow: re-based on a wider count\n"
+        )
+        code, out = self.run_detect()
+        self.assertEqual(code, 0, out)
+        self.assertRegex(out, r"allowed\s+threshold-change\s+vitest.config.ts: - ")
+
+    def test_rebased_threshold_without_reason_is_flagged(self):
+        self.repo.write("vitest.config.ts", "thresholds: { lines: 80 },\n")
+        code, out = self.run_detect()
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FLAGGED\s+threshold-change\s+vitest.config.ts: - ")
+
+    def test_reason_in_another_file_does_not_cover_a_removal(self):
+        self.repo.write("vitest.config.ts", "// thresholds removed\n")
+        self.repo.write("pyproject.toml", "fail_under = 74  # groundwork-allow: new floor\n")
+        code, out = self.run_detect()
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FLAGGED\s+threshold-change\s+vitest.config.ts: - ")
+
     def test_documentation_is_not_scanned(self):
         self.repo.write("docs/guide.md", "Never add @ts-ignore or lower the coverage threshold: 80.\n")
         code, out = self.run_detect()
