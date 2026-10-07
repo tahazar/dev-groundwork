@@ -1,0 +1,10 @@
+{
+  "name": "dev-groundwork",
+  "displayName": "Dev Groundwork",
+  "version": "0.1.0",
+  "description": "A gated development pipeline: requirements, research, design, tests, implementation, review. Checks sources, traces acceptance criteria to tests, and flags test-gaming workarounds.",
+  "author": { "name": "Taha Zar" },
+  "repository": "https://github.com/tahazar/dev-groundwork",
+  "license": "MIT",
+  "keywords": ["spec-driven", "tdd", "design-review", "acceptance-criteria", "code-review"]
+}
