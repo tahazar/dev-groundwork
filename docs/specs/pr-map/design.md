@@ -216,16 +216,29 @@ class Arrow:
 5. **Candidates.** A candidate is a place in the code that may refer to a
    box. There are three sources, and the candidates are their union:
    - **Name matches from tree-sitter.** Every identifier whose text
-     equals the last segment of a box's name (`m` for `C.m`). In
-     TypeScript that includes `identifier`, `property_identifier` and
-     shorthand properties; in Python, identifiers and attribute names.
+     equals a box's *match key*.
+     - **The match key** is the last segment of the box's name (`m` for
+       `C.m`).
+     - **Constructors.** A constructor (`__init__` and `__new__` in
+       Python, `constructor` in TypeScript) uses its class's name as its
+       match key, because a call reads `Foo(1)` or `new Foo(1)`, never
+       `__init__`. jedi's reference search does not find those calls
+       either (C50).
+     - **Node kinds.** In TypeScript the kinds are `identifier`,
+       `property_identifier`, `shorthand_property_identifier` and
+       `type_identifier`, the last so that type-only uses (`x: R`,
+       `implements R`) of a removed class are found. In Python they are
+       identifiers and attribute names.
+
      This covers calls, but also functions passed as values
      (`.action(runX)`, `key=fn`, `{ run: cmdRun }`). Scanning the whole
      repository took under 0.3 s (C10, C10b).
    - **The resolver's reference search**, for each changed or added box:
      - TypeScript `findReferences` (C13). It follows renamed imports,
-       default imports under another name, and calls made through an
-       interface two levels above the box (C43, C44, C45).
+       default imports under another name, calls made through an
+       interface two levels above the box, constructors called with
+       `new`, and methods of object literals typed by an interface (C43,
+       C44, C45, C53, C54).
      - jedi `get_references` (C16, C17b). It finds a renamed import but
        not the calls through it (C46), so pr-map follows aliases itself
        (next point).
@@ -248,13 +261,40 @@ class Arrow:
      name position of a construct the tags query found. A parameter or a
      local declared on the same line as a function's name is therefore
      never mistaken for the function.
-   - **Several locations inside one construct**, such as TypeScript
-     overloads, count as that one box.
+   - **Overloads are one box.** TypeScript overload signatures are sibling
+     declarations, and a call resolves to the one signature it matches
+     (C55). The constructs step therefore groups adjacent same-name
+     signatures with their implementation into one box, and a location
+     at any of their names is that box.
+   - **A class with its constructor.** A call of a class resolves to the
+     class in Python (C51), and to both the class and its constructor in
+     TypeScript (C52). Either answer counts as the constructor box when T
+     is the constructor, and as the class box when T is the class. Both
+     are what the call runs.
+   - **Library calls are recognised before anything is drawn.** Without
+     the project's dependencies, a library call does not resolve to the
+     library: jedi answers nothing (C56) and TypeScript answers the import
+     line in the calling file (C57). So before an empty or import-only
+     answer becomes a dashed arrow, the candidate's name is traced to its
+     import, using the leftmost name for an attribute chain (`np` in
+     `np.mean`). The import is a library import when its module is not in
+     the repository:
+     - **Python:** a top-level module that is not found under the
+       repository's project roots;
+     - **TypeScript:** a bare specifier that is neither a workspace
+       package nor a key of the project's `paths`.
+
+     A library call draws no arrow. The text section counts library calls
+     per file, so nothing disappears silently.
    - **Related box:** another box is related to the target T when one of
      these holds:
      - **TypeScript:** the candidate came from T's own `findReferences`.
-       The compiler links it to T through renames, interfaces and base
-       classes (C43 to C45).
+       The compiler links it to T through renames, interfaces, base
+       classes and typed object literals (C43 to C45, C54).
+     - **TypeScript, structural:** the box is an interface member with
+       T's name. TypeScript matches classes to interfaces by shape, so a
+       class with no `implements` clause can still be called through the
+       interface, and `findReferences` on T would not link them.
      - **Python:** the box is a member with T's name in a class that T's
        class inherits from, directly or further up. Each base-class name
        is resolved with `goto` (C41), not matched by text. The same holds
@@ -269,8 +309,9 @@ class Arrow:
    | A local variable or parameter | no arrow | no arrow | no arrow |
    | Another repository definition that is not a box (for example an attribute set in `__init__`) | possible arrow, reason "through `<path:line>`" | as for an unresolved import | possible arrow, reason "unresolved" |
    | A definition outside the repository (library, standard library) | no arrow | no arrow: boxes are constructs in the repository | no arrow |
-   | An unresolved import (the project's dependencies are not installed) | possible arrow, reason "unresolved import" | possible arrow, only when exactly one repository box has that name; otherwise listed as an unresolved call without arrows | possible arrow, reason "unresolved" |
-   | Nothing, or several unrelated boxes | possible arrow | as for an unresolved import | possible arrow, reason "unresolved" |
+   | A library import (traced as above) | no arrow, counted as a library call | no arrow, counted as a library call | no arrow |
+   | An import of a repository module that did not resolve | possible arrow, reason "unresolved import" | possible arrow, only when exactly one repository box has that name; otherwise listed as an unresolved call without arrows | possible arrow, reason "unresolved" |
+   | Nothing, or several unrelated boxes, and the name is not a library import | possible arrow | as for an unresolved import | possible arrow, reason "unresolved" |
    | Resolver failed | possible arrow, reason "resolver failed: …" | as for an unresolved import | same |
 
    What this guarantees:
@@ -279,10 +320,13 @@ class Arrow:
    - **A dashed arrow** is always a real reference site whose name, or
      alias, matches its target, and whose target the resolver could not
      rule out (AC-6, AC-7).
-   - **A caller is dropped only** when the resolver names a local, a
-     library definition, or a box unrelated to the target. A relation
-     through a rename, an interface, a base class or a protocol keeps it
-     as a dashed arrow.
+   - **A caller is dropped only** when the resolver names a local or a box
+     unrelated to the target, or when its name traces to a library import
+     (then it is counted, not shown). A relation through a rename, an
+     interface, a base class or a protocol keeps it as a dashed arrow.
+   - **A library call never draws an arrow** to a same-named repository
+     function, so `np.mean(xs)` does not point at the repository's own
+     `mean` (AC-7).
    - **jedi stopping early (C24)** cannot drop a caller: name matches and
      aliases still produce the candidate.
 
@@ -320,7 +364,8 @@ class Arrow:
    - **Header:** "Computed from `<base short sha>` (base) to `<head short
      sha>` (head)."
    - **No constructs:** "No function-level changes to map".
-   - **One Mermaid `flowchart LR` per connected group of boxes.**
+   - **One Mermaid `flowchart LR`**, as the requirements describe, until
+     it would exceed the budget below.
      - Box labels show the name and `path:line`.
      - Status shows in the label text ("changed: run"), so it does not
        depend on colour; a class adds colour.
@@ -328,8 +373,10 @@ class Arrow:
    - **Splitting.** GitHub states no Mermaid limit of its own (C29) and
      Mermaid defaults to 50,000 characters and 500 edges (C27, C28). Each
      diagram therefore stays under 45,000 characters and 450 arrows.
-     - A group over budget splits into one diagram per changed, added or
-       removed box with its arrows.
+     - Over budget, the map first splits into one diagram per connected
+       group of boxes (AC-12).
+     - A group still over budget splits into one diagram per changed,
+       added or removed box with its arrows.
      - A single box over budget splits its arrows into numbered parts.
      - A box may appear in several diagrams. Every box and arrow appears
        in at least one, which a test checks.
@@ -410,9 +457,16 @@ class Arrow:
   7. `actions/upload-artifact`, uploading the `pr-map` artifact. The pin
      comes from the action's release tags when the template is written
      (the latest tag on 2026-10-07 was v7.0.2).
-- Every step that installs, downloads or uploads (steps 2 to 5 and 7)
-  sets `continue-on-error: true`, which keeps the job from failing when
-  that step fails (C47).
+- Every step after checkout (steps 2 to 7) sets `continue-on-error: true`,
+  which keeps the job from failing when that step fails (C47). That
+  includes step 6, so a crash before `pr_map.py`'s own top-level catch
+  cannot fail the check either. Checkout is the one step left without
+  it: without the code there is nothing to map, and a failed checkout is
+  a repository problem, not the map's.
+- Hangs: each request to the TypeScript helper has a time limit. A helper
+  that does not answer is stopped and treated as failed, which is the
+  fallback above. No job-level timeout is used: whether a timed-out job
+  counts as a failed check is not something research checked.
   - An install failure leaves pr-map to report the missing package in the
     comment.
   - An upload failure loses only the artifact; the comment and the
@@ -444,7 +498,14 @@ class Arrow:
       by an interface, a Python base class two levels up, and a
       `Protocol`;
     - a parameter declared on its function's name line and then called;
-    - a local variable, and an unresolved import;
+    - a local variable, and an unresolved import of a repository module;
+    - a library import whose name equals a repository function
+      (`np.mean` next to a repository `mean`), with the library not
+      installed;
+    - constructors in both languages, called as `Foo(1)` and `new Foo(1)`;
+    - a TypeScript class with no `implements` clause called through an
+      interface;
+    - a removed class referred to only in types;
     - nested constructs, overloads, and repeated names in one file;
     - a test file outside its tsconfig's `include`.
 - **GitHub API.** A local HTTP server implements the issue comment
@@ -475,7 +536,7 @@ class Arrow:
 | AC-18 | Fork or 403: job summary only, with the reason |
 | AC-19 | Unreadable files listed; files with syntax errors mapped partially and listed |
 | AC-20 | Top-level catch posts the error |
-| AC-21 | Exit 0 on map failures; `continue-on-error` on every install, download and upload step (C47) |
+| AC-21 | Exit 0 on map failures; `continue-on-error` on every step after checkout (C47); a time limit on helper requests |
 | AC-22 | Deferred, as the requirements say. Setup gains a copy of `scripts/pr_map/` and the template after the trial in one project |
 
 ## Project rules check
