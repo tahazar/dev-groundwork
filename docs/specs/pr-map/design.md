@@ -1,0 +1,465 @@
+# Design: pr-map
+
+- Status: draft
+- Requirements: `requirements.md`; research: `research.md`
+
+## Context
+
+Nothing in dev-groundwork reads code structure today. Its scripts read
+diffs and text, and use only the standard library (C34). pr-map has to do
+three things:
+
+1. find the functions, methods and classes a pull request changed, added
+   or removed;
+2. find what calls them and what they call, drawing an arrow solid only
+   when the language's own tooling confirms it;
+3. post the result on the pull request.
+
+Research found two jobs with different tools. tree-sitter finds constructs
+quickly and survives broken code (C10, C10b, C11). Names alone are
+ambiguous for about a quarter of TypeScript calls (C12), so arrows need a
+resolver: the TypeScript LanguageService (C13, C36, C37) and jedi (C16,
+C41, C42).
+
+## Options
+
+### Option A: candidates from tree-sitter, verdicts from each language's resolver
+
+One Python program owns the whole pipeline: diff, constructs, graph,
+rendering, posting.
+
+- **Boxes.** tree-sitter parses each changed file at the base and head
+  commits. Tags-style queries find definitions and call sites (C19, C26,
+  C26b), adapted from the grammars' own tags files and Etchpad's fork
+  (C20, C21).
+- **Arrows, in two steps.** Every arrow starts as a candidate: a call site
+  whose name matches a box. The language's resolver then gives a verdict
+  by answering one question at that call site: "where is this defined?"
+  - Python: jedi `goto` with `follow_imports` (C41), in the same process.
+  - TypeScript: `getDefinitionAtPosition` (C36), in a small Node helper
+    the Python program starts once and talks to over standard input and
+    output. One LanguageService serves each tsconfig, and is reused across
+    calls.
+  - The verdict decides the arrow:
+    - it lands on the box: a solid arrow;
+    - it lands elsewhere: no arrow;
+    - it lands nowhere or on several places: a dashed "possible" arrow.
+- **Other packages.** Calls into another package of the same repository
+  resolve to its built type files, and only after a build (C38). The
+  helper therefore points the compiler's `paths` option (C39) at each
+  workspace package's source, which resolved to source with no build
+  (C40).
+- **Reuse.** `groundwork_config` provides the project root, the directory
+  skip list and file walking (C1). The merge-base diff logic, now written
+  twice (C2), moves into it as a shared helper. The tests use the existing
+  temporary-repository harness.
+
+### Option B: one language-server client for both languages
+
+Everything goes through the Language Server Protocol, the same channel
+editors use. A Python client starts `typescript-language-server` and a
+Python language server (jedi-language-server or pyright's server).
+`documentSymbol` gives the boxes; `references` and `definition` give the
+arrows.
+
+**Its strongest case:**
+- One protocol for every language. Adding Go or Rust later means adding a
+  server, not writing new resolver code.
+- Each server already handles project configuration, workspace packages
+  and incremental indexing, which Option A has to arrange itself (the
+  `paths` mapping above).
+- No tree-sitter dependency.
+
+### Option C: tree-sitter only, no resolver
+
+The smallest change: one Python program and the tree-sitter wheels (C5,
+C6), with no Node and no jedi.
+- Solid arrows only where syntax alone decides: a call to a name defined
+  once in the same file, or imported by name from a relative module path
+  that resolves to one file.
+- Everything else is dashed.
+
+**Its strongest case:**
+- The fewest moving parts and the fastest run (C10).
+- Nothing in the comment can come from a resolver bug.
+
+## Comparison
+
+| | A: tree-sitter + resolvers | B: language servers | C: tree-sitter only |
+|---|---|---|---|
+| Work for callers | One command, `pr_map.py --base <ref>` | Same | Same |
+| Reuses existing code | `groundwork_config`, test harness; resolvers used through their documented APIs (C36, C41) | Same Python parts; nothing for the protocol | Same Python parts |
+| New code and abstractions | Constructs, graph, renderer, poster; a Node helper (one function, about 100 lines); a `paths` mapping | A JSON-RPC client with server start-up, initialization and indexing waits, plus per-server quirks | Constructs, graph, renderer, poster; a syntactic import resolver |
+| Fits project rules | Rule 10 needs the program kept apart from the stdlib-only scripts (see the rules check) | Same, plus two servers to install and pin | Closest to rule 10, but still needs the tree-sitter wheels |
+| Risk and unknowns | jedi may stop early on hard code (C24), so its silence cannot be read as "no callers". The TypeScript 7 API change (C15, unverified) is avoided by pinning TypeScript 5.9.3 | Whether pyright's server gives references is unverified: research covered only its command line (C18). Start-up time unmeasured | Low technical risk |
+| Criteria it cannot meet | None | None, if the servers behave as assumed | None by the letter, but every ambiguous TypeScript call is dashed. That is 26% of calls that match a repository name (C12). The resolver calls A relies on gave the exact definition in every case measured (C37, C40, C42), though none of those was one of the most duplicated names |
+
+## Decision
+
+**Option A.**
+- **Why not B:** A meets every criterion with the least new machinery. Its
+  only resolver interface is one documented call per language (C36, C41),
+  each measured on this repository's own code (C37, C40, C42). B's
+  uniformity would help with more languages, but no criterion asks for
+  more than TypeScript and Python (AC-9). B also rests on an unmeasured
+  and partly unverified server set-up.
+- **Why not C:** C is simpler, but it gives up exact arrows for a quarter
+  of TypeScript calls. In the requirements interview on 2026-10-07 the
+  owner chose "exact, or flagged": solid wherever the language's tooling
+  can confirm a reference.
+
+## Rejected options
+
+- **B, language servers.** A protocol client and two servers to install,
+  start and wait on, for an extensibility no criterion needs (rule 2).
+  Its Python references depend on a server capability research did not
+  verify (C18 covers only pyright's command line). Revisit when a third
+  language is requested.
+- **C, tree-sitter only.** It meets the criteria's letter by drawing
+  ambiguous TypeScript calls dashed. The owner asked for solid arrows
+  wherever the language's tooling can confirm one, and A shows it can
+  (C37, C40).
+
+## Design
+
+### Where the code lives
+
+pr-map needs installed packages, so it lives apart from the stdlib-only
+checks (rule 10), in `scripts/pr_map/`:
+
+| File | Responsibility |
+|---|---|
+| `pr_map.py` | Entry point and pipeline: base ref, changed files, graph, rendering, posting |
+| `constructs.py` | tree-sitter parsing; finding constructs and call sites; byte-to-character column conversion |
+| `queries/typescript.scm`, `queries/python.scm` | Tags-style queries. Adapted from the tree-sitter grammars and Etchpad's fork (MIT), with a credit header |
+| `resolve.py` | `definition_at(path, line, column)` for both languages: jedi in-process, and the Node helper for TypeScript |
+| `resolve_ts.cjs` | Node helper: reads requests line by line on stdin and writes answers on stdout |
+| `render.py` | Mermaid diagrams, splitting, the text list, the comment body |
+| `github.py` | Upserting the comment through the REST API (standard library `urllib`); writing the job summary |
+| `requirements.txt` | Pinned: tree-sitter 0.26.0, tree-sitter-python 0.25.0, tree-sitter-typescript 0.23.2, jedi 0.20.0 (C5, C6, C17) |
+| `package.json`, `package-lock.json` | Pinned typescript 5.9.3, the version measured (C14, C36) |
+
+`groundwork_config.py` gains `merge_base(root, base)` and
+`diff_against(root, base, *args)`. `detect_workarounds.py` and
+`check_ac_coverage.py` switch to them, which removes the duplication
+research found (C2). They stay standard library only.
+
+### Data model
+
+One representation (rule 4), also written as JSON with `--json` for tests
+and for version 2's AI overlay:
+
+```python
+@dataclass(frozen=True)
+class Box:
+    id: str  # "<path>::<qualified name>", e.g. "packages/cli/src/index.ts::run"
+    kind: str  # "function" | "method" | "class" | "module"
+    name: str  # qualified: "Class.method", "outer.inner"
+    path: str  # relative to the repository root
+    line: int  # 1-based line of the name in the commit it is drawn from
+    status: str  # "changed" | "added" | "removed" | "neighbour"
+
+
+@dataclass(frozen=True)
+class Arrow:
+    source: str  # Box.id of the innermost construct containing the reference
+    target: str  # Box.id of the construct called
+    certainty: str  # "exact" | "possible"
+    at: str  # "<path>:<line>" of the call site
+    reason: str  # for "possible": "unresolved", "several definitions", "resolver failed: <why>"
+```
+
+A call at module level, outside any construct, gets a `module` box named
+after its file, so a top-level caller is not lost.
+
+### Pipeline
+
+1. **Base and files.**
+   - `base = merge_base(root, "origin/<base branch>")`.
+   - Changed files come from `diff_against(root, base, "--name-status",
+     "-M")`, filtered to `.ts`, `.tsx` and `.py` outside the skip list.
+     `-M` pairs renamed files.
+2. **Constructs.**
+   - Each changed file is parsed at both commits: the head version from
+     the working tree, the base version from `git show <base>:<path>`.
+   - A construct's identity is its path and qualified name.
+3. **Classify** (AC-1 to AC-3, AC-10). Hunk line ranges come from
+   `diff_against(root, base, "-U0", "--", path)`.
+   - **changed:** the construct is in both commits, and its head span
+     overlaps an added line or its base span overlaps a deleted line. A
+     signature change counts, because the signature is inside the span.
+   - **added:** in head only.
+   - **removed:** in base only.
+   - A renamed or moved construct shows as removed plus added. No
+     criterion asks for rename detection.
+4. **Nesting.** Constructs nest: a method sits inside a class, a function
+   inside a function. Every line and every reference site belongs to its
+   *innermost* construct only.
+   - A changed line inside method `C.m` changes `C.m`, not class `C`. `C`
+     is changed only by lines outside all of its nested constructs, such
+     as its heritage clause or a field.
+   - The source of an arrow is the innermost construct containing the
+     reference.
+   - So one edit produces one changed box, and every arrow is drawn once.
+5. **Candidates.** A candidate is a place in the code that may refer to a
+   box. There are two sources, and the candidates are their union:
+   - **Name matches from tree-sitter.** Every identifier whose text
+     equals a box's name: calls, but also functions passed as values
+     (`.action(runX)`, `key=fn`, `{ run: cmdRun }`). Scanning the whole
+     repository took under 0.3 s (C10, C10b).
+   - **The resolver's reference search.** For each changed or added box:
+     - TypeScript `findReferences` (C13), run in every LanguageService
+       whose program includes the box's file;
+     - jedi `get_references` (C16, C17b).
+
+     This adds what a name match cannot see: aliased imports (`import {
+     readClip as rc }`), default exports imported under another name,
+     and `from report import save_record as save`.
+
+   Candidates, by role:
+   - **Callers of a changed or added box:** both sources, for its name.
+   - **Callees of a changed or added box:** identifiers inside its own
+     span.
+   - **Callers of a removed box:** name matches in the head commit. The
+     resolver cannot search for a definition that no longer exists.
+6. **Verdicts** (AC-4 to AC-7). `definition_at` answers each candidate.
+   An answer is a list of locations; it is turned into a verdict like
+   this:
+   - **It counts as a box** only when the location is the name position
+     of a construct the tags query found. Several locations inside one
+     construct, such as TypeScript overloads, count as that one box.
+   - **A local variable or parameter** in the repository (`const fn =
+     pick(); fn()`) is not a box.
+   - **An import statement** means the import did not resolve, because
+     the project's dependencies are not installed.
+
+   | Answer | Caller candidate for box T | Callee candidate | Removed box R |
+   |---|---|---|---|
+   | T | exact arrow | (T calls itself) exact arrow | not possible (R is gone) |
+   | Another box that T overrides or implements: a member with T's name in a class or interface that T's class extends or implements, by the heritage clause | possible arrow, reason "through `<that box>`" | exact arrow to that box | no arrow |
+   | Another box | no arrow | exact arrow to that box | no arrow |
+   | A local variable, parameter, or a definition outside the repository | no arrow | no arrow: boxes are constructs in the repository | no arrow |
+   | An unresolved import | possible arrow, reason "unresolved import" | possible arrow, but only when exactly one repository box has that name; otherwise listed as an unresolved call, without arrows | possible arrow, reason "unresolved" |
+   | Nothing, or several boxes | possible arrow | as for an unresolved import | possible arrow, reason "unresolved" |
+   | Resolver failed | possible arrow, reason "resolver failed: …" | as for an unresolved import | same |
+
+   What this guarantees:
+   - **A solid arrow** is always a resolver answer naming that exact box
+     (AC-5).
+   - **A dashed arrow** is always a real reference site whose name
+     equals its target, and whose target the resolver could not rule
+     out (AC-6, AC-7).
+   - **A caller is only ever dropped** when the resolver positively names
+     a different, unrelated definition.
+   - **jedi stopping early (C24)** cannot drop a caller: the name-match
+     source still produces the candidate.
+   - **A call on a base type or interface**, where the box is an override
+     or implementation, stays visible as a dashed arrow.
+
+   An unresolved call with several possible repository targets is listed
+   in the text section rather than fanned out to every same-named box, so
+   that `d.get()` on an untyped value does not draw an arrow to every
+   `get` in the repository.
+7. **Resolvers.**
+   - **Python.** One `jedi.Project` per nearest directory with
+     `pyproject.toml`, `setup.cfg` or `setup.py`, else the repository
+     root. `Script.goto(line, column, follow_imports=True)` (C41).
+     Columns are converted from tree-sitter's bytes to characters.
+   - **TypeScript.** `resolve_ts.cjs` loads the pinned typescript and
+     keeps one LanguageService per nearest `tsconfig.json` (default
+     options when there is none). Its compiler options add `paths`
+     entries for each workspace package: the `name` in its
+     `package.json`, mapped from the `types` entry under the package's
+     `outDir` to the same path under its `rootDir` (C38 to C40). The
+     project's own `paths` win when both name a package.
+     - Protocol: one JSON object per line. Requests are
+       `{"id", "file", "line", "column"}`, with UTF-16 columns converted
+       in Python. Answers are `{"id", "definitions": [{"file", "line"}]}`
+       or `{"id", "error"}`.
+     - If Node or the helper is missing, or the helper dies, the
+       TypeScript candidates fall back to possible arrows with that
+       reason. The comment says so, and a warning is logged. This is the
+       only fallback, and it is tested in both directions.
+8. **Render** (AC-8, AC-10 to AC-13, AC-17, AC-19).
+   - **Header:** "Computed from `<base short sha>` (base) to `<head short
+     sha>` (head)."
+   - **No constructs:** "No function-level changes to map".
+   - **One Mermaid `flowchart LR` per connected group of boxes.**
+     - Box labels show the name and `path:line`.
+     - Status shows in the label text ("changed: run"), so it does not
+       depend on colour; a class adds colour.
+     - Exact arrows are `-->`; possible ones are `-.->|possible|`.
+   - **Splitting.** GitHub states no Mermaid limit of its own (C29) and
+     Mermaid defaults to 50,000 characters and 500 edges (C27, C28). Each
+     diagram therefore stays under 45,000 characters and 450 arrows.
+     - A group over budget splits into one diagram per changed, added or
+       removed box with its arrows.
+     - A single box over budget splits its arrows into numbered parts.
+     - A box may appear in several diagrams. Every box and arrow appears
+       in at least one, which a test checks.
+   - **Text list.** A collapsed `<details>` table of every arrow (from,
+     to, exact or possible, call site), every box without arrows, and
+     every unresolved call with its count of possible repository
+     targets.
+   - **Notes.**
+     - Files that could not be read are listed with the reason.
+     - Files with syntax errors are mapped from the parts that parse
+       (C8, C11) and listed with their error lines.
+9. **Post** (AC-14 to AC-18).
+   - **Finding the comment.** The comment carries the marker
+     `<!-- groundwork:pr-map -->`. The poster pages through the pull
+     request's issue comments and edits the one that has the marker *and*
+     was written by `github-actions[bot]`, or creates one. The pull
+     request number comes from `GITHUB_EVENT_PATH`.
+   - **Where the complete map lives.** It always goes to two places:
+     - the job summary (`GITHUB_STEP_SUMMARY`), limited to 1 MiB per step
+       (C31);
+     - a workflow artifact named `pr-map`, holding the Markdown and the
+       JSON, which has no such limit.
+
+     If the map is over 1 MiB, the summary says so and points to the
+     artifact. Either way the complete map is always one link away
+     (AC-11, AC-14).
+   - **Fork, or a 403 from the API.** The token is read-only on forks
+     (C33), so there is no comment; the summary says why (AC-18).
+   - **422 from the API.** The comment length limit is undocumented
+     (C30), so the poster reacts to a rejection instead of assuming a
+     number. It retries with smaller bodies, in this order:
+     1. move the text list out of the comment;
+     2. move diagrams out, last first, one per retry.
+
+     Each version says how much moved to the run page and links it
+     (`GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`) (AC-14).
+     The last version is the header, the counts and the link. If even
+     that is rejected, the poster stops, and the summary records the
+     API's response. The check still passes (AC-21).
+10. **Failure** (AC-19 to AC-21).
+   - Each stage wraps its errors with what it was doing ("resolving
+     TypeScript references in <file>"), keeping the cause (rule 7).
+   - The entry point catches anything left, posts "pr-map could not build
+     the map: <error>" as the comment and summary, and exits 0.
+   - Without `--post` (a contributor running it locally), a missing
+     `--base` or git exits 2. With `--post` it posts the problem and
+     exits 0, like any other failure (AC-20, AC-21).
+   - In the workflow, the install steps record a failure in a file
+     instead of failing the step. `pr_map.py` reports that failure in the
+     comment. So no step of the job fails because of the map (AC-21),
+     without relying on `continue-on-error` semantics research did not
+     cover.
+
+### Workflow template: `templates/ci/pr-map.yml`
+
+- Trigger: `pull_request`.
+- Permissions: `contents: read`, `pull-requests: write`.
+- Concurrency: group `pr-map-${{ github.event.pull_request.number }}`
+  with `cancel-in-progress: false`. A second run on the same pull request
+  waits for the first, then finds and edits the first run's comment, so
+  two quick pushes cannot create two comments (AC-16). Runs wait rather
+  than cancel, so no check ever shows as cancelled.
+- Steps, each action pinned to a commit SHA (rule 12):
+  1. `actions/checkout`, the pin already in `templates/ci/groundwork.yml`,
+     with `fetch-depth: 0`;
+  2. `actions/setup-python`, the pin already in `.github/workflows/ci.yml`,
+     Python 3.12;
+  3. `actions/setup-node` v7.0.0 at `820762786026740c76f36085b0efc47a31fe5020`,
+     the commit `git ls-remote` reports for the tag (and the pin
+     ableton-workflow-helper's CI uses), Node 22;
+  4. `pip install -r .groundwork/bin/pr_map/requirements.txt`;
+  5. `npm ci --prefix .groundwork/bin/pr_map`;
+  6. `python .groundwork/bin/pr_map/pr_map.py --base "origin/${{ github.base_ref }}" --post`;
+  7. `actions/upload-artifact`, uploading the `pr-map` artifact. The pin
+     comes from the action's release tags when the template is written
+     (the latest tag on 2026-10-07 was v7.0.2).
+- The project's own dependencies are not installed. Calls into libraries
+  are not drawn anyway, and repository code resolves without them (C40).
+
+### Tests
+
+- **Location.** `tests_pr_map/`, a separate directory with its own CI job
+  that installs `requirements.txt` and runs `npm ci`. The stdlib-only
+  tests keep running without the packages (rule 10).
+- **Fixture repositories**, built with the existing temporary-repository
+  harness. The TypeScript fixture has two workspace packages and
+  same-named functions; the Python fixture has same-named functions and a
+  call through an alias.
+  - Each fixture has a hand-written list of its references: each site
+    with its true target, or "uncertain" where the code itself does not
+    decide (an untyped parameter). Every arrow on the map is checked
+    against it (AC-7):
+    - **an exact arrow** must match a site and its true target;
+    - **a possible arrow** must match a site whose true target is that
+      box, or one marked "uncertain" whose name is that box's.
+  - The fixtures also cover each case the verdicts distinguish: aliased
+    and default imports, a function passed as a value, a call through an
+    interface or base class, a local variable, an unresolved import,
+    nested constructs and overloads.
+- **GitHub API.** A local HTTP server implements the issue comment
+  endpoints, with modes for 403 and 422. It fakes a process boundary
+  (rule 5); no mocks.
+
+## Criteria coverage
+
+| Criterion | How the design meets it |
+|---|---|
+| AC-1 | Classify: changed, head span overlaps added lines or base span overlaps deleted lines; signatures inside the span |
+| AC-2 | Classify: added, in head only |
+| AC-3 | Classify: removed; callers by name in head, with verdicts (table, last column) |
+| AC-4 | Candidates from names and the resolver's reference search, one step each way; innermost construct as source |
+| AC-5 | Exact only on a resolver answer naming the box (verdict table) |
+| AC-6 | Possible on nothing, several or resolver failure, with the reason |
+| AC-7 | Arrows exist only at real reference sites; fixture tests check every arrow, exact and possible, against a hand-written list |
+| AC-8 | Box label shows the qualified name and `path:line` |
+| AC-9 | `.ts`, `.tsx`, `.py` with both queries and resolvers; a mixed fixture |
+| AC-10 | "No function-level changes to map" |
+| AC-11 | No cap anywhere in the pipeline |
+| AC-12 | Splitting by group, then by box, then by part, under 45,000 characters and 450 arrows |
+| AC-13 | Collapsed text table of every arrow and box |
+| AC-14 | 422 retries with smaller bodies and a link; the complete map always in the summary or artifact |
+| AC-15 | Workflow on `pull_request` (opened and new commits) |
+| AC-16 | Marker comment by `github-actions[bot]`, edited in place; runs on one pull request queue |
+| AC-17 | Header with base and head short SHAs |
+| AC-18 | Fork or 403: job summary only, with the reason |
+| AC-19 | Unreadable files listed; files with syntax errors mapped partially and listed |
+| AC-20 | Top-level catch posts the error |
+| AC-21 | Exit 0 on map failures; install failures recorded, not fatal |
+| AC-22 | Deferred, as the requirements say. Setup gains a copy of `scripts/pr_map/` and the template after the trial in one project |
+
+## Project rules check
+
+1. **Reuse before building:**
+   - `groundwork_config` (root, skip list, file walking);
+   - the temporary-repository test harness;
+   - the merge-base diff helper, consolidated rather than written a third
+     time (C2).
+2. **Simplest design:** one entry point and two options (`--base`,
+   `--post`), plus `--json` for tests. No language-server layer, no
+   plugin system for languages.
+3. **Libraries directly:** tree-sitter queries, jedi `goto` and the
+   LanguageService are called as documented. `definition_at` is a single
+   function per language, not a wrapper library. It exists so the verdict
+   table has one source of answers.
+4. **One representation:** `Box` and `Arrow`. The JSON output is the same
+   data, serialized.
+5. **Tests from criteria:** fixture repositories and a local HTTP server.
+   No mocks of the unit under test.
+6. **Never weaken a check:** no skips. The one fallback (TypeScript
+   resolver missing) is commented, logged as a warning and tested both
+   ways.
+7. **Errors are specific:**
+   - a resolver failure is a reason on the arrow, not a missing arrow;
+   - API failures are told apart by status (403 versus 422);
+   - wrapped errors keep their cause.
+8. **Sources:** every factual claim above cites research. GitHub's own
+   Mermaid and comment limits are unverified (C29, C30), and the design
+   works around both instead of assuming numbers.
+9. **Evidence before claims:** the measured behaviours behind the decision
+   (C37, C40, C42) come from scripts kept in `spike/`.
+10. **Scripts run anywhere (exception, with reason):** pr-map needs
+    installed packages. As the rule requires, it lives apart
+    (`scripts/pr_map/`, its own requirements, workflow and test job). The
+    stdlib-only scripts do not import it, and still run without it.
+11. **CI does not need the plugin:** the workflow runs the copy in
+    `.groundwork/bin/pr_map/`.
+12. **Actions pinned:** checkout and setup-python reuse this repository's
+    pins; setup-node and upload-artifact are pinned to the commits their
+    release tags resolve to.
