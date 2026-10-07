@@ -17,9 +17,14 @@ Spec files live in `<specDir>/<feature>/` (default `docs/specs/<feature>/`).
 ## When to skip stages
 
 If you can describe the diff in one sentence, skip stages 1 to 3 and write
-the test first. This is the threshold Anthropic's Claude Code guide uses for
-skipping a plan [1]. A bug fix starts at stage 4 with a test that reproduces
-the bug.
+the test first (`/dev-groundwork:test-first`). This is the threshold
+Anthropic's Claude Code guide uses for skipping a plan [1]. A bug fix
+starts with `/dev-groundwork:debug`, which finds the root cause before any
+code changes, and continues test-first with a test that reproduces the
+bug. Both prove the test fails without the change: a test never seen
+failing may not test the change at all. The two skills adapt the
+systematic-debugging, test-driven-development and
+verification-before-completion skills from Superpowers [8].
 
 ## Why each stage exists
 
@@ -144,3 +149,8 @@ Retrieved 2026-10-07 unless noted.
    https://github.com/github/spec-kit/blob/main/spec-driven.md (Tier 1)
 7. Anthropic, "System Card: Claude Opus 4 & Claude Sonnet 4," May 2025.
    https://www.anthropic.com/claude-4-system-card (Tier 1)
+8. J. Vincent, Superpowers v6.4.2, `skills/systematic-debugging`,
+   `skills/test-driven-development` and
+   `skills/verification-before-completion`, MIT license.
+   https://github.com/obra/superpowers (Tier 1 for what the skills say;
+   adapted, not copied)
