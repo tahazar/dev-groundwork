@@ -107,6 +107,27 @@ sees calls that a name match cannot.
   `actions/checkout` documents checking out the pull request's head commit
   instead of the merge commit (C49).
 
+## Addendum for the design: constructors, overloads and uninstalled libraries
+
+Added 2026-10-07 after the third design review.
+
+- **Constructors.**
+  - jedi `get_references` on `__init__` returned only the definition, not
+    the call `Foo(1)` (C50).
+  - jedi `goto` on `Foo(1)` lands on the class (C51).
+  - TypeScript `getDefinitionAtPosition` on `new Foo(1)` returns both the
+    class and its constructor (C52).
+  - `findReferences` on the constructor finds `new Foo` (C53).
+- **Object literals.** `findReferences` on a method of an object literal
+  typed by an interface found calls through the interface and through
+  the literal itself (C54).
+- **Overloads.** `getDefinitionAtPosition` on an overloaded call returned
+  only the matching overload signature (C55).
+- **Uninstalled libraries.** With the library not installed:
+  - jedi `goto` on `np.mean` returned nothing (C56);
+  - TypeScript resolved `Command` from `"commander"` to the import in
+    the calling file (C57).
+
 ## Answers to open questions
 
 - Package line above the diagram: deferred to the owner after version 1, as
@@ -443,4 +464,44 @@ sees calls that a name match cannot.
   tier: 1
   quote: Checkout pull request HEAD commit instead of merge commit
   retrieved: 2026-10-07
+- id: C50
+  claim: jedi get_references on Foo.__init__ returned only its definition, not the call Foo(1).
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi get_references Foo.__init__: [('lib.py', 2, 8)]"
+- id: C51
+  claim: jedi goto on the call Foo(1) lands on class Foo.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi goto Foo(1): [('lib.py', 1, 6, 'class')]"
+- id: C52
+  claim: TypeScript getDefinitionAtPosition on new Foo returns both the class and its constructor.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: getDefinitionAtPosition new Foo: [ 'lib.ts:2:14 class', 'lib.ts:2:20 constructor' ]
+- id: C53
+  claim: TypeScript findReferences on a constructor found the new Foo expression.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: findReferences constructor: uses in use.ts = [ 'use.ts:3:51 "Foo"' ]
+- id: C54
+  claim: findReferences on a method of an object literal typed by an interface found two calls in use.ts.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: findReferences fake.run (object literal): uses in use.ts = [ 'use.ts:3:64 "run"', 'use.ts:3:73 "run"' ]
+- id: C55
+  claim: getDefinitionAtPosition on an overloaded call returned only one overload signature.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "getDefinitionAtPosition ov(1): [ 'lib.ts:5:17 function' ]"
+- id: C56
+  claim: With numpy not installed, jedi goto on np.mean returned nothing.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi goto np.mean: []"
+- id: C57
+  claim: With commander not installed, TypeScript resolved Command to the import alias in the calling file.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "getDefinitionAtPosition Command (bare specifier, not installed): [ 'use.ts:1:10 alias' ]"
 ```
