@@ -1,0 +1,13 @@
+{
+  "specDir": "docs/specs",
+  "testGlobs": ["tests/**"],
+  "onEdit": [{ "glob": "**/*.py", "run": "ruff format {file} && ruff check {file}" }],
+  "onStop": "python3 -m unittest discover tests -q",
+  "sources": {
+    "tier1": ["code.claude.com", "docs.anthropic.com", "www.anthropic.com", "github.com", "docs.python.org"],
+    "tier2": []
+  },
+  "workarounds": {
+    "ignorePaths": ["scripts/detect_workarounds.py", "tests/**"]
+  }
+}

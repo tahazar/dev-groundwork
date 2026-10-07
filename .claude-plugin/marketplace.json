@@ -1,0 +1,12 @@
+{
+  "name": "dev-groundwork",
+  "owner": { "name": "Taha Zar" },
+  "description": "Taha Zar's development pipeline plugin.",
+  "plugins": [
+    {
+      "name": "dev-groundwork",
+      "source": "./",
+      "description": "Gated development pipeline: requirements, research, design, tests, implementation, review."
+    }
+  ]
+}

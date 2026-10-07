@@ -1,0 +1,24 @@
+name: Groundwork
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  groundwork:
+    name: Groundwork checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Detect workarounds
+        run: python3 .groundwork/bin/detect_workarounds.py --base "origin/${{ github.base_ref }}"
+      - name: Check acceptance-criteria coverage
+        run: python3 .groundwork/bin/check_ac_coverage.py --changed-since "origin/${{ github.base_ref }}"
+      - name: Check citations in changed research files
+        run: |
+          files=$(git diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}"... -- '**/research.md')
+          [ -z "$files" ] || python3 .groundwork/bin/check_citations.py --require $files
