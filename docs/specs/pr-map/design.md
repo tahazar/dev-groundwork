@@ -233,6 +233,11 @@ class Arrow:
        `Baz(Foo)` does not override it. Each subclass's base names are
        resolved with `goto` (C41). TypeScript's `findReferences` on the
        constructor already finds `new Baz(3)` and `super(…)`.
+     - **Python calls on the runtime class.** `cls(…)` inside a
+       classmethod and `type(self)(…)` inside a method of the class or a
+       subclass are candidates for its constructor. Which class runs is
+       decided at run time, so they are possible arrows, reason "through
+       `cls`".
      - **Node kinds.** In TypeScript the kinds are `identifier`,
        `property_identifier`, `shorthand_property_identifier` and
        `type_identifier`, the last so that type-only uses (`x: R`,
@@ -304,6 +309,13 @@ class Arrow:
        repository's project roots;
      - **TypeScript:** a bare specifier that is neither a workspace
        package nor a key of the project's `paths`.
+
+     When the leftmost name is a local variable instead of an import, its
+     initial value is traced the same way: `const program = new
+     Command()` or `arr = np.array(xs)` makes `program.action(...)` and
+     `arr.mean()` library calls. This follows one assignment in the same
+     scope. A variable assigned more than once, or a parameter, is not
+     traced, and its calls stay as unresolved.
 
      A library call draws no arrow. The text section counts library calls
      per file, so nothing disappears silently.
@@ -537,6 +549,10 @@ class Arrow:
       `isinstance(x, Foo)`;
     - a function next to a same-named interface data property and an
       untyped object key (`notes()` beside `c.notes`);
+    - library objects held in a variable (`program = new Command()`,
+      `arr = np.array(xs)`) whose methods share names with repository
+      functions;
+    - `cls(…)` and `type(self)(…)` in Python;
     - a TypeScript class with no `implements` clause called through an
       interface;
     - a removed class referred to only in types;
