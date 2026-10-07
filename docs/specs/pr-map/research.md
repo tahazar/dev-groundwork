@@ -90,6 +90,23 @@ measured.
 - jedi's `goto` follows imports when asked (C41) and resolved three calls
   named `save_record` to the two different functions they mean (C42).
 
+## Addendum for the design: references through aliases and hierarchies
+
+Added 2026-10-07 after the design review asked whether reference search
+sees calls that a name match cannot.
+
+- TypeScript `findReferences` found the call through a renamed import
+  (`rc()`), the call through a default import under another name
+  (`loader()`), and a call on an interface two levels above the changed
+  method (`b.run()` where `Impl extends Mid implements Base`) (C43, C44,
+  C45).
+- jedi `get_references` found only the renamed import line, not the call
+  `save()` through it (C46). pr-map has to follow the alias itself.
+- GitHub Actions: `continue-on-error` on a step keeps the job from failing
+  (C47); a newer run in a concurrency group cancels a pending one (C48);
+  `actions/checkout` documents checking out the pull request's head commit
+  instead of the merge commit (C49).
+
 ## Answers to open questions
 
 - Package line above the diagram: deferred to the owner after version 1, as
@@ -388,4 +405,42 @@ measured.
   source: file:docs/specs/pr-map/spike/results.txt
   tier: 1
   quote: "save_record at awh_analysis/__main__.py:589 -> ['awh_analysis/drumstats.py:372']"
+- id: C43
+  claim: findReferences on readClip found the call through the renamed import rc.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: named export readClip: uses in use.ts = [ '1:18 "readClip"', '1:30 "rc"', '2:59 "rc"' ]
+- id: C44
+  claim: findReferences on a default export found the call through a differently named default import.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: default export loadSet: uses in use.ts = [ '1:8 "loader"', '2:66 "loader"' ]
+- id: C45
+  claim: findReferences on Impl.run found a call made through the Base interface two levels up.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: Impl.run: uses in use.ts = [ '2:45 "run"' ]
+- id: C46
+  claim: jedi get_references on save_record returned only the renamed import line, not the call through the alias.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi save_record via renamed import: [('use.py', 1, 19, 'save_record')]"
+- id: C47
+  claim: continue-on-error on a step keeps the job from failing when that step fails.
+  source: https://raw.githubusercontent.com/github/docs/main/content/actions/reference/workflows-and-actions/workflow-syntax.md
+  tier: 1
+  quote: Prevents a job from failing when a step fails. Set to `true` to allow a job to pass when this step fails.
+  retrieved: 2026-10-07
+- id: C48
+  claim: In a concurrency group, a newly queued run cancels an existing pending run.
+  source: https://raw.githubusercontent.com/github/docs/main/data/reusables/actions/actions-group-concurrency.md
+  tier: 1
+  quote: Any existing `pending` job or workflow in the same concurrency group, if it exists, will be canceled and the new queued job or workflow will take its place.
+  retrieved: 2026-10-07
+- id: C49
+  claim: actions/checkout documents checking out the pull request head commit instead of the merge commit.
+  source: https://raw.githubusercontent.com/actions/checkout/main/README.md
+  tier: 1
+  quote: Checkout pull request HEAD commit instead of merge commit
+  retrieved: 2026-10-07
 ```

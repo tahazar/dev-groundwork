@@ -44,3 +44,13 @@ $ python py_def.py analysis awh_analysis/__main__.py:107:save_record awh_analysi
 save_record at awh_analysis/__main__.py:107 -> ['awh_analysis/report.py:377']
 save_record at awh_analysis/__main__.py:152 -> ['awh_analysis/report.py:377']
 save_record at awh_analysis/__main__.py:589 -> ['awh_analysis/drumstats.py:372']
+
+# Reference search through renamed imports, default imports and an interface (alias-fixture/, same versions)
+
+$ node alias_refs.cjs <typescript> alias-fixture/ts
+named export readClip: uses in use.ts = [ '1:18 "readClip"', '1:30 "rc"', '2:59 "rc"' ]
+default export loadSet: uses in use.ts = [ '1:8 "loader"', '2:66 "loader"' ]
+Impl.run: uses in use.ts = [ '2:45 "run"' ]
+
+$ python alias_refs_py.py alias-fixture/py
+jedi save_record via renamed import: [('use.py', 1, 19, 'save_record')]
