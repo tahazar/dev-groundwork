@@ -54,6 +54,17 @@ def render_comment(pr_map: dict, run_url: str, max_chars: int = MAX_CHARS, max_a
 
     run_url, when not empty, is linked as the workflow run that built the map.
     """
+    return comment_versions(pr_map, run_url, max_chars, max_arrows)[0]
+
+
+def comment_versions(pr_map: dict, run_url: str, max_chars: int = MAX_CHARS, max_arrows: int = MAX_ARROWS) -> list[str]:
+    """The comment body, then ever smaller versions for when GitHub rejects it as too long (design, step 9).
+
+    The comment length limit is undocumented (C30), so the poster tries these
+    in order. After the complete body: the text list moved out, then the
+    diagrams moved out, last first, one per version; each says what moved and
+    links run_url. The last version is the header, the counts and the link.
+    """
     boxes = pr_map["boxes"]
     arrows = pr_map["arrows"]
     notes = pr_map.get("notes", {})
@@ -62,16 +73,20 @@ def render_comment(pr_map: dict, run_url: str, max_chars: int = MAX_CHARS, max_a
         for end in (a["source"], a["target"]):
             if end not in by_id:
                 raise ValueError(f"rendering the map: arrow at {a['at']} names box {end!r}, which is not in the map")
-    out = ["### Function map", "", f"Computed from `{pr_map['base'][:7]}` (base) to `{pr_map['head'][:7]}` (head)."]
+    header = ["### Function map", "", f"Computed from `{pr_map['base'][:7]}` (base) to `{pr_map['head'][:7]}` (head)."]
     if run_url:
-        out[-1] += f" Built by [this workflow run]({run_url})."
-    out.append("")
+        header[-1] += f" Built by [this workflow run]({run_url})."
+    header.append("")
+    where = f"[the workflow run's summary]({run_url})" if run_url else "the workflow run's summary"
     if not any(b["status"] in STATUSES for b in boxes):
-        out += [NOTHING + ".", ""]
-        out += _notes(notes)
-        return "\n".join(out)
-    out += [_counts(boxes, arrows), ""]
-    out += [
+        listed = _notes(notes)
+        whole = [*header, NOTHING + ".", "", *listed]
+        if not listed:
+            return ["\n".join(whole)]
+        brief = [*header, NOTHING + ".", "", f"Notes moved to {where}: the comment was too long."]
+        return ["\n".join(whole), "\n".join(brief)]
+    counts = [_counts(boxes, arrows), ""]
+    legend = [
         "Solid arrows are references the language's own tooling resolved to that exact definition; "
         "dashed `possible` arrows are references it could not rule out.",
         "",
@@ -81,13 +96,32 @@ def render_comment(pr_map: dict, run_url: str, max_chars: int = MAX_CHARS, max_a
     def fits(part_boxes: list[dict], edges: list[Edge]) -> bool:
         return len(edges) <= max_arrows and len(mermaid(part_boxes, edges, ids)) <= max_chars
 
+    drawn = []
     for d in split(boxes, edges_of(arrows), fits):
-        if d.title:
-            out += [f"**{d.title}**", ""]
-        out += ["```mermaid", mermaid(d.boxes, d.edges, ids) + "```", ""]
-    out += _notes(notes)
-    out += _text_list(boxes, arrows, notes, by_id)
-    return "\n".join(out)
+        drawn.append(
+            ([f"**{d.title}**", ""] if d.title else []) + ["```mermaid", mermaid(d.boxes, d.edges, ids) + "```", ""]
+        )
+
+    def version(kept: int, moved: str) -> str:
+        out = [*header, *counts]
+        if moved:
+            out += [f"**Shortened:** the comment was too long, so {moved} moved to {where}.", ""]
+        out += legend
+        for lines in drawn[:kept]:
+            out += lines
+        out += _notes(notes)
+        if not moved:
+            out += _text_list(boxes, arrows, notes, by_id)
+        return "\n".join(out)
+
+    n = len(drawn)
+    versions = [version(n, ""), version(n, "the text list")]
+    for kept in range(n - 1, -1, -1):
+        versions.append(version(kept, f"the text list and {n - kept} of {n} diagram{'s' if n != 1 else ''}"))
+    versions.append(
+        "\n".join([*header, *counts, f"**Shortened:** the comment was too long, so the map moved to {where}."])
+    )
+    return versions
 
 
 def edges_of(arrows: list[dict]) -> list[Edge]:
