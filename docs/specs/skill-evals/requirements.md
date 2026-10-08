@@ -1,6 +1,6 @@
 # Requirements: skill-evals
 
-- Status: draft
+- Status: approved (2026-10-08, by the owner)
 - Requested by: the owner, 2026-10-08: "The eval piece is important - we
   want to be able to measure and prove fidelity. Let's adapt the parts they
   do better", after a review of addyosmani/agent-skills, whose skills are
