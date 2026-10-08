@@ -1,6 +1,6 @@
 # Design: pr-map
 
-- Status: draft
+- Status: approved (2026-10-08, by the owner; five fresh-context reviews, the last round of fixes not re-reviewed by the owner's choice)
 - Requirements: `requirements.md`; research: `research.md`
 
 ## Context
