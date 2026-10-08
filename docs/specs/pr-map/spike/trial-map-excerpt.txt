@@ -1,0 +1,11 @@
+Excerpts from the trial map's SVG as the owner's client rendered it (2026-10-08).
+The full SVG is not kept: it is 580 KB.
+
+Root element:
+<svg xmlns="http://www.w3.org/2000/svg" id="diagram" width="100%" class="flowchart" style="max-width: 5316.34375px;" viewBox="0 0 5316.34375 13888.66796875" role="graphics-document document" aria-roledescription="flowchart-v2">
+
+A box label:
+<tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> merge&amp;#95;base</tspan>
+
+changed class style:
+.changed rect{fill:rgb(255, 248, 197)!important;stroke:rgb(154, 103, 0)!important;}
