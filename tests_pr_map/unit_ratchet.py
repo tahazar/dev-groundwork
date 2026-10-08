@@ -32,6 +32,31 @@ FAKE_SUITE = textwrap.dedent(
     """
 )
 
+SETUP_FAILS = textwrap.dedent(
+    """
+    import unittest
+
+    class Setup(unittest.TestCase):
+        @classmethod
+        def setUpClass(cls):
+            raise RuntimeError("setup fails on purpose")
+
+        def test_never_runs(self):
+            pass
+    """
+)
+
+EXPECTED_FAILURE = textwrap.dedent(
+    """
+    import unittest
+
+    class Expected(unittest.TestCase):
+        @unittest.expectedFailure
+        def test_known_bad(self):
+            self.fail("known bad")
+    """
+)
+
 
 class RatchetTests(unittest.TestCase):
     def setUp(self):
@@ -77,6 +102,19 @@ class RatchetTests(unittest.TestCase):
         proc = self.ratchet("test_fake.Fake.test_skipped")
         self.assertEqual(proc.returncode, 1)
         self.assertIn("skipped: skipped on purpose", proc.stderr)
+
+    def test_listed_test_of_a_class_whose_setup_fails_fails_the_run(self):
+        (self.dir / "test_setup.py").write_text(SETUP_FAILS, encoding="utf-8")
+        proc = self.ratchet("test_setup.Setup.test_never_runs")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("1 of 5 acceptance tests pass", proc.stdout)
+        self.assertIn("setup fails on purpose", proc.stderr)
+
+    def test_listed_expected_failure_fails_the_run(self):
+        (self.dir / "test_expected.py").write_text(EXPECTED_FAILURE, encoding="utf-8")
+        proc = self.ratchet("test_expected.Expected.test_known_bad")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("test_expected.Expected.test_known_bad did not succeed", proc.stderr)
 
     def test_listed_id_naming_no_test_fails_the_run(self):
         proc = self.ratchet("test_fake.Fake.test_good", "test_fake.Fake.test_gone")

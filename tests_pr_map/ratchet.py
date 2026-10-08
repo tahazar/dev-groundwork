@@ -16,7 +16,6 @@ not listed are printed so they can be added.
 from __future__ import annotations
 
 import argparse
-import io
 import sys
 import unittest
 from pathlib import Path
@@ -48,9 +47,21 @@ def case_id(test: unittest.TestCase) -> str:
     return getattr(test, "test_case", test).id()
 
 
-def not_passing(result: unittest.TestResult) -> set[str]:
-    bad = result.failures + result.errors + result.skipped
-    return {case_id(test) for test, _ in bad} | {case_id(test) for test in result.unexpectedSuccesses}
+class RecordingResult(unittest.TestResult):
+    """Records the ids of tests that succeed.
+
+    A test passes only if unittest reports its success. Counting "every test
+    not reported as failing" would count tests that never ran, such as those
+    of a class whose setUpClass raised.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.succeeded: set[str] = set()
+
+    def addSuccess(self, test: unittest.TestCase) -> None:
+        super().addSuccess(test)
+        self.succeeded.add(test.id())
 
 
 def run(start: Path, passing_file: Path) -> int:
@@ -63,37 +74,44 @@ def run(start: Path, passing_file: Path) -> int:
             print(error, file=sys.stderr)
         return 1
 
-    ids = collect_ids(suite)
-    unknown = sorted(set(listed) - set(ids))
+    ids = set(collect_ids(suite))
+    unknown = sorted(set(listed) - ids)
     if unknown:
         print(f"{passing_file.name} lists ids that name no test:", file=sys.stderr)
         for name in unknown:
             print(f"  {name}", file=sys.stderr)
         return 1
 
-    result = unittest.TextTestRunner(stream=io.StringIO(), verbosity=0).run(suite)
-    bad = not_passing(result)
-    passing = [name for name in ids if name not in bad]
-    print(f"{len(set(passing))} of {len(set(ids))} acceptance tests pass ({len(set(listed))} required)")
+    result = RecordingResult()
+    suite.run(result)
+    passing = result.succeeded & ids
+    print(f"{len(passing)} of {len(ids)} acceptance tests pass ({len(set(listed))} required)")
 
-    newly = sorted(set(passing) - set(listed))
+    newly = sorted(passing - set(listed))
     if newly:
         print(f"passing but not in {passing_file.name} yet (add them):")
         for name in newly:
             print(f"  {name}")
 
-    regressed = sorted(set(listed) & bad)
+    regressed = set(listed) - passing
     if regressed:
         print(f"\n{len(regressed)} test(s) listed in {passing_file.name} do not pass:", file=sys.stderr)
+        reported = set()
         for test, trace in result.failures + result.errors:
-            if case_id(test) in regressed:
+            # Errors in setUpClass or setUpModule carry a placeholder id, not a test's; show them all.
+            if case_id(test) in regressed or case_id(test) not in ids:
+                reported.add(case_id(test))
                 print(f"\n=== {test.id()}\n{trace}", file=sys.stderr)
         for test, reason in result.skipped:
             if case_id(test) in regressed:
+                reported.add(case_id(test))
                 print(f"\n=== {test.id()} skipped: {reason}", file=sys.stderr)
         for test in result.unexpectedSuccesses:
             if case_id(test) in regressed:
+                reported.add(case_id(test))
                 print(f"\n=== {test.id()} passed but is marked expectedFailure", file=sys.stderr)
+        for name in sorted(regressed - reported):
+            print(f"\n=== {name} did not succeed (expected failure, or did not run)", file=sys.stderr)
         return 1
     return 0
 
