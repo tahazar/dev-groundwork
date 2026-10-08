@@ -691,6 +691,7 @@ def _read_construction(
     the constructor that runs (C52, C61); `new Plain(3)` for a subclass
     without its own constructor answers Plain and its base's constructor.
     The pair counts as the class when the class is the target, else as the
+    constructor; for a callee, as the class when it inherits the
     constructor. A type annotation or `Foo.make()` answers the class alone,
     which stays the class. A call of the class whose removed constructor is
     the target returns the note "removed constructor".
@@ -709,8 +710,12 @@ def _read_construction(
     runs = [loc for loc in locations if loc.kind == "constructor" and box_at[loc] is not None]
     if not runs:
         return locations, ""
+    inherited = {b for b in classes if not any(code.constructs[box_at[r]].parent == b for r in runs)}
     if candidate.role != CALLEE and candidate.target in classes:
         chosen = {loc for loc in locations if box_at[loc] == candidate.target}
+    elif candidate.role == CALLEE and inherited:
+        # A callee `new Plain()` is one arrow to the constructor when the class defines one, else to the class.
+        chosen = {loc for loc in locations if box_at[loc] in inherited}
     else:
         chosen = set(runs)
     pair = set(runs) | {loc for loc in locations if box_at[loc] in classes}

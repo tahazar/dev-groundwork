@@ -114,6 +114,33 @@ class DefinitionTests(unittest.TestCase):
         s = repo.site("packages/cli/src/index.ts", 'parse("a")')
         self.assertEqual(repo.resolver.trace_import("packages/cli/src/index.ts", s.line, s.column), "repository")
 
+    def test_unmapped_workspace_package_is_not_a_library(self):
+        files = {
+            "packages/core/package.json": json.dumps({"name": "@x/core", "types": "./src/index.ts"}),
+            "packages/core/src/index.ts": "export function parse(s: string): number {\n  return s.length;\n}\n",
+            "packages/cli/package.json": package("@x/cli"),
+            "packages/cli/tsconfig.json": TSCONFIG,
+            "packages/cli/src/index.ts": (
+                'import { parse } from "@x/core";\nexport function run(): number {\n  return parse("a");\n}\n'
+            ),
+        }
+        repo = TsRepo(self, files)
+        v = repo.judge("packages/cli/src/index.ts", 'parse("a")', CALLER, "packages/core/src/index.ts::parse")
+        self.assertEqual(v, Verdict("possible", "packages/core/src/index.ts::parse", "unresolved import"))
+
+    def test_lines_end_at_newline_only(self):
+        lib = "export function target(): number {\n  return 1;\n}\n"
+        use = (
+            'import { target } from "./lib.js";\n'
+            "// a line separator \u2028 inside a comment\n"
+            "export function caller(): number {\n  return target();\n}\n"
+        )
+        repo = TsRepo(self, project({"src/lib.ts": lib, "src/use.ts": use}))
+        line = use.split("\n").index("  return target();") + 1  # not splitlines, which also breaks at U+2028
+        [s] = [s for s in repo.files["src/use.ts"].sites if s.line == line and s.name == "target"]
+        [loc] = repo.resolver.definition_at("src/use.ts", s.line, s.column)
+        self.assertEqual((loc.path, loc.line, loc.column, loc.name), ("src/lib.ts", 1, 16, "target"))
+
     def test_the_projects_own_paths_win_over_the_workspace_mapping(self):
         own = json.loads(TSCONFIG)
         own["compilerOptions"]["paths"] = {"@x/*": ["./src/shim.ts"]}
@@ -229,6 +256,17 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(v, Verdict("possible", "src/lib.ts::Shaped.run", "through `src/lib.ts::Task.run`"))
         self.assertEqual(repo.judge("src/lib.ts", "t.run()", CALLER, "src/lib.ts::Runner.run", "run"), Verdict(""))
 
+    def test_generic_interface_is_not_ruled_out(self):
+        lib = (
+            "export interface Repo<T> {\n  save(x: T): void;\n}\n"
+            "export class Users {\n  save(x: string): void {}\n}\n"
+            "export function go(r: Repo<string>): void {\n  r.save('a');\n}\n"
+        )
+        repo = TsRepo(self, project({"src/lib.ts": lib}))
+        self.assertEqual(repo.code.implements["src/lib.ts::Users.save"], {"src/lib.ts::Repo.save"})
+        v = repo.judge("src/lib.ts", "r.save(", CALLER, "src/lib.ts::Users.save", "save")
+        self.assertEqual(v, Verdict("possible", "src/lib.ts::Users.save", "through `src/lib.ts::Repo.save`"))
+
     def test_data_property_with_a_function_name_draws_no_arrow(self):
         lib = (
             "export function notes(): number[] {\n  return [];\n}\n"
@@ -322,6 +360,8 @@ class ConstructorTests(unittest.TestCase):
     def test_callee_new_is_one_arrow_to_the_constructor_else_the_class(self):
         self.assertEqual(self.repo.judge("src/use.ts", "Foo(1)", CALLEE), Verdict("exact", CTOR))
         self.assertEqual(self.repo.judge("src/use.ts", "Bare()", CALLEE), Verdict("exact", "src/lib.ts::Bare"))
+        v = self.repo.judge("src/use.ts", "Plain(3)", CALLEE)
+        self.assertEqual(v, Verdict("exact", "src/lib.ts::Plain"), "Plain defines no constructor")
 
     def test_call_of_a_class_whose_constructor_was_removed_is_listed(self):
         repo = TsRepo(

@@ -32,21 +32,27 @@ const packageDirs = JSON.parse(process.argv[3] || "[]").map((dir) => path.resolv
 
 const unix = (file) => file.split(path.sep).join("/");
 
+// Every package name in the repository: an import of one is never a library import (design, step 6).
+const packageNames = new Set();
 // Workspace package name -> its source entry, absolute (design, step 7; C38 to C40). Without it, a
 // call into another package resolves to that package's built declaration file, and only after a build.
-const workspace = workspacePaths(packageDirs);
+// Built on first use, so a broken package tsconfig becomes an error answer naming it, not a crash.
+let workspace;
 
+const registry = ts.createDocumentRegistry(); // shared, so lib files are parsed once for every tsconfig
 const services = new Map(); // tsconfig path, or the repository root when no tsconfig is found -> Service
 
-function workspacePaths(dirs) {
+function workspacePaths() {
+  if (workspace) return workspace;
   const found = {};
-  for (const dir of dirs) {
+  for (const dir of packageDirs) {
     let pkg;
     try {
       pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
     } catch {
       continue; // not a readable package.json: not a package this mapping can serve
     }
+    if (typeof pkg.name === "string") packageNames.add(pkg.name);
     const types = pkg.types || pkg.typings;
     const config = path.join(dir, "tsconfig.json");
     if (typeof pkg.name !== "string" || typeof types !== "string" || !fs.existsSync(config)) continue;
@@ -59,6 +65,7 @@ function workspacePaths(dirs) {
     const source = [stem, stem.replace(/\.ts$/, ".tsx")].find((file) => fs.existsSync(file));
     if (source) found[pkg.name] = unix(source);
   }
+  workspace = found;
   return found;
 }
 
@@ -107,7 +114,7 @@ class Service {
     }
     const own = options.paths || {};
     const paths = { ...own };
-    for (const [name, source] of Object.entries(workspace)) {
+    for (const [name, source] of Object.entries(workspacePaths())) {
       // The project's own paths win when both name a package (design, step 7).
       if (!Object.keys(own).some((key) => pathsKeyMatches(key, name))) paths[name] = [source];
     }
@@ -130,7 +137,7 @@ class Service {
       directoryExists: ts.sys.directoryExists,
       getDirectories: ts.sys.getDirectories,
     };
-    this.ls = ts.createLanguageService(host, ts.createDocumentRegistry());
+    this.ls = ts.createLanguageService(host, registry);
   }
 
   // The source file of an absolute path, added to the root files when the tsconfig does not include it
@@ -169,8 +176,34 @@ function locate(where) {
   const file = unix(path.resolve(root, where.file));
   const service = serviceFor(file);
   const source = service.sourceFile(file);
-  const position = source.getPositionOfLineAndCharacter(where.line - 1, where.column);
+  const position = positionOf(source, where.line, where.column);
   return { file, service, source, position };
+}
+
+// Lines here end at "\n" only, as in resolve.py and tree-sitter. TypeScript's own line map also breaks at
+// "\r", U+2028 and U+2029, which would shift every line below one of them.
+function lineStarts(source) {
+  if (!source.newlineStarts) {
+    const starts = [0];
+    for (let i = source.text.indexOf("\n"); i >= 0; i = source.text.indexOf("\n", i + 1)) starts.push(i + 1);
+    source.newlineStarts = starts;
+  }
+  return source.newlineStarts;
+}
+
+function positionOf(source, line, column) {
+  const starts = lineStarts(source);
+  if (!(line >= 1 && line <= starts.length)) throw new Error(`line ${line} is outside the file's ${starts.length} lines`);
+  const end = line < starts.length ? starts[line] - 1 : source.text.length;
+  if (column > end - starts[line - 1]) throw new Error(`column ${column} is past the end of line ${line}`);
+  return starts[line - 1] + column;
+}
+
+function lineAndColumn(source, position) {
+  const starts = lineStarts(source);
+  let line = 0;
+  while (line + 1 < starts.length && starts[line + 1] <= position) line += 1;
+  return { line: line + 1, column: position - starts[line] };
 }
 
 // The innermost node whose text (without leading trivia) contains position.
@@ -188,8 +221,8 @@ function nodeAt(source, position) {
 
 function location(service, file, start, kind, name) {
   const source = service.ls.getProgram().getSourceFile(file);
-  const { line, character } = source.getLineAndCharacterOfPosition(start);
-  return { file, line: line + 1, column: character, kind, name, local: isLocal(nodeAt(source, start)) };
+  const { line, column } = lineAndColumn(source, start);
+  return { file, line, column, kind, name, local: isLocal(nodeAt(source, start)) };
 }
 
 // A parameter, a type parameter, or a declaration inside a function body: something no box can be.
@@ -207,7 +240,8 @@ function isLocal(node) {
 function definition(request) {
   const { file, service, position } = locate(request);
   const found = service.ls.getDefinitionAtPosition(file, position) || [];
-  const name = (d) => (d.containerName ? `${d.containerName}.${d.name}` : d.name);
+  // A module's container name is its quoted path ("/repo/src/lib".target): left out.
+  const name = (d) => (d.containerName && !d.containerName.startsWith('"') ? `${d.containerName}.${d.name}` : d.name);
   return { locations: found.map((d) => location(service, unix(d.fileName), d.textSpan.start, d.kind, name(d))) };
 }
 
@@ -239,12 +273,18 @@ function assignable(request) {
     throw new Error(`no class is named at ${request.source.file}:${request.source.line}:${request.source.column}`);
   }
   const targetSource = program.getSourceFile(targetFile);
-  const at = targetSource.getPositionOfLineAndCharacter(request.target.line - 1, request.target.column);
+  const at = positionOf(targetSource, request.target.line, request.target.column);
   const member = nodeAt(targetSource, at).parent;
   if (!member || !(ts.isMethodSignature(member) || ts.isPropertySignature(member))) return { assignable: false };
   if (!ts.isInterfaceDeclaration(member.parent)) return { assignable: false };
   if (ts.isPropertySignature(member) && !checker.getTypeAtLocation(member).getCallSignatures().length) {
     return { assignable: false };
+  }
+  if (member.parent.typeParameters || cls.typeParameters) {
+    // A generic type's declared form leaves its parameters open, so `Users` is not assignable to
+    // `Repo<T>` although it fits `Repo<string>`. Without the instantiation the call uses, the class is
+    // not ruled out: related, which only ever gives a possible arrow.
+    return { assignable: true };
   }
   const classType = checker.getTypeAtLocation(cls.name);
   const ifaceType = checker.getTypeAtLocation(member.parent.name);
@@ -260,7 +300,8 @@ function trace(request) {
   const specifier = importOf(leftmost(nodeAt(source, position)), checker, service, file, true);
   if (specifier === undefined) return { traced: "" };
   if (specifier.startsWith(".") || path.isAbsolute(specifier)) return { traced: "repository" };
-  const ownPackage = Object.keys(workspace).some((name) => specifier === name || specifier.startsWith(name + "/"));
+  workspacePaths();
+  const ownPackage = [...packageNames].some((name) => specifier === name || specifier.startsWith(name + "/"));
   const pathsKey = Object.keys(service.options.paths || {}).some((key) => pathsKeyMatches(key, specifier));
   return { traced: ownPackage || pathsKey ? "repository" : "library" };
 }
