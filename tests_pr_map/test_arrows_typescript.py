@@ -68,6 +68,10 @@ class TypeScriptArrowTests(unittest.TestCase):
         m = self.repo.build()
         self.assertEqual(m.certainty(box_id("src/use.ts", "a"), box_id("src/lib.ts", "readClip")), "exact")
         self.assertEqual(m.certainty(box_id("src/use.ts", "b"), box_id("src/lib.ts", "loadSet")), "exact")
+        import_line = self.repo.site("src/use.ts", "import loader")
+        self.assertFalse(
+            [a for a in m.data["arrows"] if a["at"].startswith(import_line + ":")], "import lines draw no arrows"
+        )
 
     def test_workspace_package_resolves_to_source_without_a_build(self):  # [pr-map AC-5]
         core_ts = TSCONFIG

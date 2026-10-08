@@ -31,9 +31,20 @@ class PythonArrowTests(unittest.TestCase):
             {
                 self.repo.site("use.py", "return target()"): target,
                 self.repo.site("lib.py", "return leaf()"): box_id("lib.py", "leaf"),
-                self.repo.site("use.py", "from lib import target"): target,
             },
         )
+
+    def test_import_lines_draw_no_arrows(self):  # [pr-map AC-4] [pr-map AC-7]
+        lib = "def target():\n    return 1\n"
+        use = "from lib import target\n\n\ndef caller():\n    return target()\n"
+        unused = "from lib import target\n\n\ndef other():\n    return 2\n"
+        self.repo.base({"lib.py": lib, "use.py": use, "unused.py": unused})
+        self.repo.head({"lib.py": lib.replace("return 1", "return 3")})
+        m = self.repo.build()
+        target = box_id("lib.py", "target")
+        self.assertEqual(m.certainty(box_id("use.py", "caller"), target), "exact", "positive control")
+        self.assertEqual(len(m.arrows(target=target)), 1, "the use in caller, not the import lines")
+        self.assertIsNone(m.box("unused.py", "other"), "an unused import is the linter's job, not the map's")
 
     def test_same_named_functions_are_told_apart(self):  # [pr-map AC-5] [pr-map AC-7]
         report = "def save_record(path):\n    return path\n"
