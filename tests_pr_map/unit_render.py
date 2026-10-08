@@ -130,6 +130,12 @@ class EscapeTests(unittest.TestCase):
         comment = render.render_comment(a_map([b("lib.py", "f", "changed")], [], notes), "")
         self.assertIn("byte &lt;0xff&gt; &amp; more", comment)
 
+    def test_a_multi_line_reason_stays_in_its_table_row(self):
+        hub, caller = b("lib.py", "hub", "changed"), b("use.py", "use")
+        m = a_map([hub, caller], [arrow(caller, hub, "possible", reason="resolver failed: TS2304\n  at x.ts")])
+        comment = render.render_comment(m, "")
+        self.assertIn("| possible (resolver failed: TS2304 at x.ts) | `use.py:9` |", comment)
+
 
 class SplitOrderTests(Covered):
     def test_a_map_that_fits_is_one_untitled_diagram(self):

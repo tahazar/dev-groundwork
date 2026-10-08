@@ -114,7 +114,7 @@ def split(boxes: list[dict], edges: list[Edge], fits: Callable[[list[dict], list
             continue
         for anchor, own in _by_box(members, inner, by_id):
             name = f"{title}: {_label(anchor)}"
-            parts = _parts(anchor, own, boxes, fits)
+            parts = _parts(anchor, own, members, fits)
             if len(parts) == 1:
                 result.append(Diagram(name, *parts[0]))
             else:
@@ -333,5 +333,8 @@ def _cell(text: str) -> str:
 
 
 def _text(text: str) -> str:
-    """Free text (a parser's or resolver's reason) with `<`, `>` and `&` escaped so it is not read as HTML."""
-    return html.escape(str(text), quote=False)
+    """Free text (a parser's or resolver's reason) on one line, with `<`, `>` and `&` escaped so it is not read as HTML.
+
+    A multi-line reason (a TypeScript error) would end a table row or a list item, so its lines are joined.
+    """
+    return html.escape(" ".join(str(text).split()), quote=False)
