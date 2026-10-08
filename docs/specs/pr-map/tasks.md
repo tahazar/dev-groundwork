@@ -18,7 +18,7 @@ make them pass.
   columns, syntax-error lines. (AC-1 to AC-3 groundwork, AC-8, AC-9, AC-19)
 - [x] 4. Classification against the diff: changed, added, removed, with
   innermost attribution of changed lines. (AC-1, AC-2, AC-3, AC-10)
-- [ ] 5. Python resolver: `definition_at` and reference search with jedi,
+- [x] 5. Python resolver: `definition_at` and reference search with jedi,
   and the verdict rules. (AC-4 to AC-7 for Python)
 - [ ] 6. TypeScript resolver: `resolve_ts.cjs`, the `paths` mapping for
   workspace packages, and the Python side of the protocol, including the
