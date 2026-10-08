@@ -30,12 +30,20 @@ from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
-import constructs
 import github
 import render
-import resolve
-from constructs import Construct, FileConstructs, Site
-from resolve import CALLEE, CALLER, REMOVED, Answer, Candidate, Code, Resolver, ResolverError
+
+try:
+    import constructs
+    import resolve
+    from constructs import Construct, FileConstructs, Site
+    from resolve import CALLEE, CALLER, REMOVED, Answer, Candidate, Code, Resolver, ResolverError
+except ImportError as exc:
+    # Fires when tree-sitter or jedi is not installed (the workflow's install step failed). build_map
+    # raises it as a MapError, so main still reaches its error path and posts it (design, step 10).
+    MISSING: ImportError | None = exc
+else:
+    MISSING = None
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from groundwork_config import SKIP_DIRS, diff_against, merge_base, project_root
@@ -91,6 +99,9 @@ def build_map(root: Path, base: str, node: str = "node") -> dict:
 
     node is the Node executable the TypeScript resolver runs on.
     """
+    if MISSING is not None:
+        log.warning("pr-map cannot import its packages: %s", MISSING)
+        raise MapError(f"missing package {MISSING.name or MISSING} (the install step may have failed)") from MISSING
     base_sha = _git_step(f"finding the merge base of {base}", merge_base, root, base)
     head_sha = _git_step("reading the head commit", _git, root, "rev-parse", "HEAD").strip()
     boxes: list[Box] = []
