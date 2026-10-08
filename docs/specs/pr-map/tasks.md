@@ -37,9 +37,11 @@ make them pass.
   actions (look up the upload-artifact pin from its release tag) and
   install steps that record failures instead of failing. actionlint
   clean. (AC-15, AC-21)
-- [ ] 11. Trial in ableton-workflow-helper: copy `scripts/pr_map/` and the
+- [x] 11. Trial in ableton-workflow-helper: copy `scripts/pr_map/` and the
   workflow by hand, open a small pull request, and check the comment
   against the code. Record what the trial found. (AC-22 stays deferred
-  until this passes)
+  until this passes) Recorded in `trial.md`: it did not pass, and AC-22
+  stays deferred until the follow-up tasks listed there (11a to 11g) are
+  done.
 - [ ] 12. Documentation: README rows for the new check and its install
   needs, and a line in `docs/pipeline.md`.
