@@ -309,5 +309,39 @@ class ScanTests(unittest.TestCase):
         self.assertIn("not UTF-8", unreadable["bad.py"])
 
 
+class ImportSiteTests(unittest.TestCase):
+    def test_python_import_names_are_import_sites_and_the_renamed_name_carries_its_alias(self):
+        found = {(s.name, s.line): s for s in parse("a.py", "from m import x as y, z\nimport p.q as r\ny()\n").sites}
+        self.assertEqual(found[("x", 1)].alias, "y")
+        self.assertEqual(found[("z", 1)].alias, "")
+        self.assertEqual(found[("q", 2)].alias, "r", "the module `p.q` is what `r` names")
+        self.assertEqual(found[("p", 2)].alias, "")
+        self.assertTrue(all(s.imported for s in found.values() if s.line < 3))
+        self.assertFalse(found[("y", 3)].imported)
+
+    def test_typescript_imports_and_re_exports_are_import_sites(self):
+        text = 'import loader, { readClip as rc } from "./lib.js";\nexport { a as b } from "./x.js";\nrc();\n'
+        found = {(s.name, s.line): s for s in parse("a.ts", text).sites}
+        self.assertEqual(found[("readClip", 1)].alias, "rc")
+        self.assertEqual(found[("a", 2)].alias, "b")
+        self.assertTrue(found[("loader", 1)].imported)
+        self.assertFalse(found[("rc", 3)].imported)
+
+    def test_local_export_list_is_not_an_import(self):
+        found = {(s.name, s.line): s for s in parse("a.ts", "function f() {}\nexport { f };\n").sites}
+        self.assertFalse(found[("f", 2)].imported)
+
+
+class RuntimeClassSiteTests(unittest.TestCase):
+    def test_cls_and_type_self_calls_are_marked(self):
+        text = (
+            "class A:\n    @classmethod\n    def make(cls):\n        return cls(0)\n\n"
+            "    def copy(self):\n        return type(self)(1)\n\n"
+            "    def other(self, x):\n        return type(x)(1), cls.make(), type(self)\n"
+        )
+        marked = {(s.name, s.line): s.runtime for s in parse("a.py", text).sites if s.runtime}
+        self.assertEqual(marked, {("cls", 4): "cls", ("type", 7): "type(self)"})
+
+
 if __name__ == "__main__":
     unittest.main()

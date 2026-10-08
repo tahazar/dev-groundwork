@@ -383,6 +383,13 @@ class ConstructorTests(unittest.TestCase):
         found = resolve.runners("lib.py::Foo", "__init__", self.repo.code)
         self.assertEqual(found, {"lib.py::Foo": "", "lib.py::Baz": ""})
 
+    def test_a_class_python_cannot_order_is_skipped_not_fatal(self):
+        bases = {**self.repo.code.bases, "w.py::X": ("w.py::A", "w.py::B"), "w.py::Y": ("w.py::B", "w.py::A")}
+        bases["w.py::Z"] = ("w.py::X", "w.py::Y")  # no consistent order: Python rejects Z
+        code = Code(self.repo.code.constructs, self.repo.code.positions, bases)
+        found = resolve.runners("lib.py::Foo", "__init__", code)
+        self.assertEqual(found, {"lib.py::Foo": "", "lib.py::Baz": ""})
+
     def test_base_outside_the_repository_first_makes_the_call_possible(self):
         lib = (
             "import json\n\n\nclass Foo:\n    def __init__(self):\n        pass\n\n\n"

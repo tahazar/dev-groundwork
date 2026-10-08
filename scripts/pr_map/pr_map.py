@@ -10,23 +10,28 @@ the GitHub Actions environment (GITHUB_API_URL, GITHUB_TOKEN,
 GITHUB_REPOSITORY, GITHUB_EVENT_PATH, GITHUB_STEP_SUMMARY,
 GITHUB_SERVER_URL, GITHUB_RUN_ID).
 
-Design: docs/specs/pr-map/design.md. This file is a stub until the
-implementation tasks fill it in; the acceptance tests in tests_pr_map/
-define its behaviour.
+Design: docs/specs/pr-map/design.md. build_map runs Pipeline steps 1 to 6:
+the boxes, then the arrows between them and their neighbours (connect).
+The comment body and posting are still stubs; the acceptance tests in
+tests_pr_map/ define their behaviour.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from collections import Counter, defaultdict
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import constructs
-from constructs import Construct, FileConstructs
+import resolve
+from constructs import Construct, FileConstructs, Site
+from resolve import CALLEE, CALLER, REMOVED, Answer, Candidate, Code, Resolver, ResolverError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from groundwork_config import SKIP_DIRS, diff_against, merge_base, project_root
@@ -36,6 +41,13 @@ from groundwork_config import SKIP_DIRS, diff_against, merge_base, project_root
 # Format"), a count left out means one line, and a count of 0 means no lines on
 # that side, with the start naming the line the change sits after.
 HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", re.MULTILINE)
+
+# The name of a module box: a reference outside every construct belongs to its file (design, data model).
+MODULE = "<module>"
+# A constructor's own name; its callers write the class's name instead (design, step 5).
+CONSTRUCTORS = {".py": ("__init__", "__new__"), ".ts": ("constructor",), ".tsx": ("constructor",)}
+
+log = logging.getLogger("pr_map")
 
 
 class MapError(RuntimeError):
@@ -54,6 +66,15 @@ class Box:
 
 
 @dataclass(frozen=True)
+class Arrow:
+    source: str  # Box.id of the innermost construct containing the reference
+    target: str  # Box.id of the construct referred to
+    certainty: str  # "exact" | "possible"
+    at: str  # "<path>:<line>:<column>" of the reference site
+    reason: str  # for "possible": "unresolved", "through <box>", "resolver failed: <why>"
+
+
+@dataclass(frozen=True)
 class FileChange:
     """A changed source file: its path at the base commit and in the working tree, None where it is absent."""
 
@@ -61,11 +82,15 @@ class FileChange:
     new: str | None
 
 
-def build_map(root: Path, base: str) -> dict:
-    """Return the map as JSON-ready data: base, head, boxes, arrows and notes."""
+def build_map(root: Path, base: str, node: str = "node") -> dict:
+    """Return the map as JSON-ready data: base, head, boxes, arrows and notes.
+
+    node is the Node executable the TypeScript resolver runs on.
+    """
     base_sha = _git_step(f"finding the merge base of {base}", merge_base, root, base)
     head_sha = _git_step("reading the head commit", _git, root, "rev-parse", "HEAD").strip()
     boxes: list[Box] = []
+    gone: list[Construct] = []  # the base-commit constructs of removed boxes
     skipped: list[dict] = []
     syntax_errors: list[dict] = []
     name_status = _git_step(
@@ -102,13 +127,290 @@ def build_map(root: Path, base: str) -> dict:
                 *dict.fromkeys((change.old, change.new)),
             )
             deleted, added = parse_hunks(diff)
-        boxes += classify(before, after, deleted, added)
+        found = classify(before, after, deleted, added)
+        removed = {b.id for b in found if b.status == "removed"}
+        gone += [c for c in before.constructs if c.id in removed] if before else []
+        boxes += found
+    files, unreadable = constructs.scan(root)
+    listed = {s["path"] for s in skipped}
+    skipped += [{"path": path, "reason": reason} for path, reason in sorted(unreadable.items()) if path not in listed]
+    resolver = Resolver(root, node)
+    try:
+        arrows, neighbours, graph_notes = connect(root, files, boxes, gone, resolver)
+    finally:
+        resolver.close()
     notes: dict = {}
     if skipped:
         notes["skipped"] = skipped
     if syntax_errors:
         notes["syntax_errors"] = syntax_errors
-    return {"base": base_sha, "head": head_sha, "boxes": [asdict(b) for b in boxes], "arrows": [], "notes": notes}
+    notes.update(graph_notes)
+    return {
+        "base": base_sha,
+        "head": head_sha,
+        "boxes": [asdict(b) for b in boxes + neighbours],
+        "arrows": [asdict(a) for a in arrows],
+        "notes": notes,
+    }
+
+
+def connect(
+    root: Path, files: dict[str, FileConstructs], boxes: list[Box], gone: list[Construct], resolver: Resolver
+) -> tuple[list[Arrow], list[Box], dict]:
+    """Arrows to and from the boxes, the neighbour boxes they reach, and the text section's notes.
+
+    Design, Pipeline steps 5 and 6. files are every source file in the head
+    tree; gone are the base-commit constructs of the removed boxes.
+    """
+    failures: list[dict] = []
+    code = _code(root, files, boxes, gone, resolver, failures)
+    candidates = Candidates(files, code)
+    for box in boxes:
+        target = code.constructs[box.id]
+        if box.status == "removed":
+            candidates.callers(target, REMOVED, ())
+            continue
+        try:
+            found = resolver.references(target.path, target.line, target.column)
+        except ResolverError as exc:
+            # jedi stopping early, or the TypeScript fallback: the name matches still give the callers.
+            log.warning("searching references to %s: %s", target.id, exc)
+            failures.append({"at": _at(target.path, target.line, target.column), "reason": str(exc)})
+            found = []
+        candidates.callers(target, CALLER, found)
+        candidates.callees(target)
+
+    answers = Answers(resolver)
+    live: dict[str, list[str]] = defaultdict(list)  # match key -> live construct ids, for unresolved callees
+    defined = set(code.positions.values())
+    for c in code.constructs.values():
+        if c.id in defined:
+            live[_short(c)].append(c.id)
+    arrows: dict[tuple[str, str, str], Arrow] = {}
+    notes: dict[str, dict[str, dict]] = defaultdict(dict)  # kind -> site -> entry: one entry per site
+    library: Counter[str] = Counter()
+    library_sites: set[str] = set()
+    for candidate, source in candidates.items():
+        at = _at(candidate.path, candidate.line, candidate.column)
+        v = resolve.verdict(candidate, answers.at(candidate), code, live.get(candidate.name, ()))
+        if v.certainty:
+            key = (source, v.target, at)
+            if key not in arrows or arrows[key].certainty == "possible":
+                arrows[key] = Arrow(source, v.target, v.certainty, at, v.reason)
+        elif v.note == "library" and candidate.call and at not in library_sites:
+            # Counted once per call: `np` in `np.mean(xs)` is the same library call as `mean`.
+            library_sites.add(at)
+            library[candidate.path] += 1
+        elif v.note == "refers" and v.refers_to != f"{candidate.path}:{candidate.line}":
+            # The site's own line is where the attribute is assigned (`self.notes = ...`): nothing to point to.
+            notes["refers"][at] = {"at": at, "source": source, "name": candidate.name, "refers_to": v.refers_to}
+        elif v.note == "unresolved" and v.options:
+            notes["unresolved"][at] = {
+                "at": at,
+                "source": source,
+                "name": candidate.name,
+                "reason": v.reason,
+                "options": list(v.options),
+            }
+        elif v.note == "removed constructor":
+            notes["removed_constructor_calls"][at] = {"at": at, "source": source, "target": v.target}
+
+    ordered = sorted(arrows.values(), key=lambda a: (a.source, a.target, a.at))
+    present = {b.id for b in boxes}
+    neighbours: dict[str, Box] = {}
+    for a in ordered:
+        for end in (a.source, a.target):
+            if end not in present and end not in neighbours:
+                neighbours[end] = _neighbour(end, code)
+    result: dict = {kind: list(entries.values()) for kind, entries in notes.items()}
+    if library:
+        result["library_calls"] = [{"path": path, "count": n} for path, n in sorted(library.items())]
+    if failures:
+        result["resolver_failures"] = failures
+    if resolver.typescript_failure:
+        result["typescript_fallback"] = resolver.typescript_failure
+    return ordered, list(neighbours.values()), result
+
+
+class Candidates:
+    """Reference sites that may refer to a box, by role (design, step 5), each with its arrow's source.
+
+    A site found twice for the same target is one candidate; `referenced`
+    is kept when either finding came from the target's own findReferences.
+    """
+
+    def __init__(self, files: dict[str, FileConstructs], code: Code):
+        self.code = code
+        self._found: dict[tuple, tuple[Candidate, str]] = {}
+        self._at: dict[tuple[str, int, int], Site] = {}
+        self._named: dict[str, list[tuple[str, Site]]] = defaultdict(list)
+        self._owned: dict[str, list[tuple[str, Site]]] = defaultdict(list)
+        for file in files.values():
+            for site in file.sites:
+                self._at[(file.path, site.line, site.column)] = site
+                self._named[site.name].append((file.path, site))
+                if site.owner is not None:
+                    self._owned[site.owner].append((file.path, site))
+
+    def items(self) -> list[tuple[Candidate, str]]:
+        return list(self._found.values())
+
+    def callers(self, target: Construct, role: str, references) -> None:
+        """Candidates for target's callers: name matches, the resolver's references, aliases, and `cls(...)`."""
+        keys, runners = self._keys(target)
+        typescript = Path(target.path).suffix in resolve.TYPESCRIPT
+        for key in keys:
+            for path, site in self._named.get(key, ()):
+                self._caller(path, site, target, role, referenced=False)
+        for loc in references:
+            site = self._at.get((loc.path, loc.line, loc.column)) if loc.path is not None else None
+            if site is not None:
+                self._caller(loc.path, site, target, role, referenced=typescript)
+        if role == CALLER and runners:
+            for path, site in self._named.get("cls", []) + self._named.get("type", []):
+                if site.runtime and self._inside(site.owner, runners):
+                    candidate = Candidate(path, site.line, site.column, site.name, True, role, target.id, site.runtime)
+                    self._add(candidate, site.owner or _module_id(path))
+
+    def callees(self, box: Construct) -> None:
+        """Every identifier inside the box's own span, nested constructs left out (design, step 4)."""
+        for path, site in self._owned.get(box.id, ()):
+            if not site.imported:
+                self._add(Candidate(path, site.line, site.column, site.name, site.call, CALLEE), box.id)
+
+    def _caller(self, path: str, site: Site, target: Construct, role: str, referenced: bool) -> None:
+        if site.imported:
+            # An import line draws no arrow; the uses of the name it renames to are candidates (design, step 5).
+            if site.alias:
+                for other_path, other in self._named.get(site.alias, ()):
+                    if other_path == path and not other.imported:
+                        self._caller(path, other, target, role, referenced=False)
+            return
+        candidate = Candidate(path, site.line, site.column, site.name, site.call, role, target.id, "", referenced)
+        self._add(candidate, site.owner or _module_id(path))
+
+    def _add(self, candidate: Candidate, source: str) -> None:
+        key = (candidate.path, candidate.line, candidate.column, candidate.role, candidate.target)
+        known = self._found.get(key)
+        if known is not None and (known[0].referenced or not candidate.referenced) and not candidate.through:
+            return
+        if known is not None:
+            candidate = replace(candidate, referenced=candidate.referenced or known[0].referenced)
+        self._found[key] = (candidate, source)
+
+    def _keys(self, target: Construct) -> tuple[set[str], set[str]]:
+        """The target's match keys, and for a Python constructor the ids of its runner classes."""
+        keys = {_short(target)}
+        cls = self.code.constructs.get(target.parent or "")
+        if cls is None or cls.kind != "class" or _short(target) not in CONSTRUCTORS.get(Path(target.path).suffix, ()):
+            return keys, set()
+        keys.add(_short(cls))
+        if Path(target.path).suffix != ".py":
+            return keys, set()  # findReferences finds subclass calls, `super(...)` and `new this` (C62)
+        runners = set(resolve.runners(cls.id, _short(target), self.code))
+        keys.update(self.code.constructs[r].name.rsplit(".", 1)[-1] for r in runners if r in self.code.constructs)
+        return keys, runners
+
+    def _inside(self, owner: str | None, classes: set[str]) -> bool:
+        """Whether a site's innermost construct is, or sits inside, one of classes."""
+        while owner is not None:
+            if owner in classes:
+                return True
+            owner = self.code.constructs[owner].parent if owner in self.code.constructs else None
+        return False
+
+
+class Answers:
+    """The resolver's answer at each site, asked once per site (design, step 6)."""
+
+    def __init__(self, resolver: Resolver):
+        self.resolver = resolver
+        self._cache: dict[tuple[str, int, int], Answer] = {}
+
+    def at(self, candidate: Candidate) -> Answer:
+        key = (candidate.path, candidate.line, candidate.column)
+        if key not in self._cache:
+            self._cache[key] = self._ask(*key)
+        return self._cache[key]
+
+    def _ask(self, path: str, line: int, column: int) -> Answer:
+        try:
+            locations = tuple(self.resolver.definition_at(path, line, column))
+            # Only an empty or import-only answer (C56, C57) needs the import traced: library or not.
+            if all(loc.kind == "alias" for loc in locations) or not locations:
+                return Answer(locations, traced=self.resolver.trace_import(path, line, column))
+            return Answer(locations)
+        except ResolverError as exc:
+            return Answer(error=str(exc))
+
+
+def _code(
+    root: Path,
+    files: dict[str, FileConstructs],
+    boxes: list[Box],
+    gone: list[Construct],
+    resolver: Resolver,
+    failures: list[dict],
+) -> Code:
+    """What the verdicts know: constructs, name positions, Python class bases and TypeScript structural matches."""
+    by_id, positions = resolve.index(files.values())
+    for c in gone:
+        by_id.setdefault(c.id, c)
+    present = set(positions.values())
+    live = [c for c in by_id.values() if c.id in present]
+    bases = {c.id: _class_bases(root, c, positions, resolver, failures) for c in live if c.kind == "class" and c.bases}
+    implements = {}
+    for box in boxes:
+        c = by_id[box.id]
+        if box.status == "removed" or c.kind != "method" or Path(c.path).suffix not in resolve.TYPESCRIPT:
+            continue
+        try:
+            implements[c.id] = resolver.structural(c, live)
+        except ResolverError as exc:
+            # The TypeScript fallback: no structural matches, so callers through an interface are possible arrows
+            # only when findReferences linked them; resolver_failures and typescript_fallback say why.
+            log.warning("matching %s to interfaces: %s", c.id, exc)
+            failures.append({"at": _at(c.path, c.line, c.column), "reason": str(exc)})
+    return Code(by_id, positions, bases, implements)
+
+
+def _class_bases(
+    root: Path, c: Construct, positions: dict, resolver: Resolver, failures: list[dict]
+) -> tuple[str, ...]:
+    """A Python class's bases (Resolver.class_bases).
+
+    Fallback: when jedi fails on a base, every base keeps the name the
+    source gives it, which reads as a class outside the repository, as
+    class_bases does for a base jedi cannot place. Its constructor's
+    callers then become possible arrows instead of being dropped.
+    """
+    try:
+        return resolver.class_bases(c, positions)
+    except ResolverError as exc:
+        log.warning("resolving the bases of %s: %s; using their names as written", c.id, exc)
+        failures.append({"at": _at(c.path, c.line, c.column), "reason": str(exc)})
+        lines = (root / c.path).read_text(encoding="utf-8").split("\n")
+        return tuple(re.match(r"\w*", lines[line - 1][column:]).group(0) for line, column in c.bases)
+
+
+def _neighbour(box_id: str, code: Code) -> Box:
+    path, _, name = box_id.partition("::")
+    if name == MODULE:
+        return Box(id=box_id, kind="module", name=Path(path).name, path=path, line=1, column=0, status="neighbour")
+    return _box(code.constructs[box_id], "neighbour")
+
+
+def _module_id(path: str) -> str:
+    return f"{path}::{MODULE}"
+
+
+def _short(c: Construct) -> str:
+    """The last segment of a construct's name: `m` for `C.m`."""
+    return c.name.rsplit(".", 1)[-1]
+
+
+def _at(path: str, line: int, column: int) -> str:
+    return f"{path}:{line}:{column}"
 
 
 def parse_name_status(text: str) -> list[FileChange]:

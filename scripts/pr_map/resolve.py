@@ -545,10 +545,19 @@ def runners(cls: str, method: str, code: Code) -> dict[str, str]:
 
     A class is a runner when its order reaches cls before any other repository
     class that defines method (design, step 5: a mixin listed first, or a
-    subclass with its own `__init__`, takes it out).
+    subclass with its own `__init__`, takes it out). A class whose bases
+    cannot be ordered is not a runner: Python rejects it when it is created
+    (TypeError), so it never constructs anything.
     """
-    found = {other: _runs(other, cls, method, code) for other in code.bases.keys() | {cls}}
-    return {other: outside for other, outside in found.items() if outside is not None}
+    found = {}
+    for other in code.bases.keys() | {cls}:
+        try:
+            outside = _runs(other, cls, method, code)
+        except ValueError:
+            continue
+        if outside is not None:
+            found[other] = outside
+    return found
 
 
 def _runs(other: str, cls: str, method: str, code: Code) -> str | None:

@@ -46,6 +46,12 @@ SIGNATURES = {"function_signature", "method_signature", "abstract_method_signatu
 # handle those.
 WRAPPERS = {"decorated_definition", "export_statement"}
 
+# Statements that import names. An identifier inside one is an import line, not a
+# reference site (design, step 5); a TypeScript `export ... from` re-export is one too.
+IMPORTS = {"import_statement", "import_from_statement", "future_import_statement"}
+# An imported item that renames what it imports: `x as y` (Python), `{ x as y }` (TypeScript).
+RENAMES = {"aliased_import", "import_specifier", "export_specifier"}
+
 
 class UnreadableSource(ValueError):
     """A source file that cannot be decoded, so its columns cannot be converted."""
@@ -81,6 +87,9 @@ class Site:
     column: int  # 0-based character column
     call: bool  # the callee of a call or `new` (including TypeScript `super(...)` and `new this(...)`)
     owner: str | None  # id of the innermost construct containing it; None at module level
+    imported: bool = False  # inside an import statement: never an arrow's site, only a way to an alias
+    alias: str = ""  # for the imported name of `x as y` or `{ x as y }`: y
+    runtime: str = ""  # Python `cls(...)` or `type(self)(...)`: "cls" or "type(self)", on `cls` or `type`
 
 
 @dataclass(frozen=True)
@@ -229,6 +238,7 @@ def parse(path: str, source: bytes) -> FileConstructs:
         node = references[start]
         owner = enclosing(node)
         line, column = position(node)
+        imported, alias = _import_of(node)
         sites.append(
             Site(
                 name=node.text.decode("utf-8"),
@@ -236,6 +246,9 @@ def parse(path: str, source: bytes) -> FileConstructs:
                 column=column,
                 call=start in calls,
                 owner=ids[owner] if owner is not None else None,
+                imported=imported,
+                alias=alias,
+                runtime=_runtime_class(node) if path.endswith(".py") else "",
             )
         )
 
@@ -304,6 +317,42 @@ def _base_names(node: Node) -> list[Node]:
         if base.type == "identifier":
             names.append(base)
     return names
+
+
+def _import_of(node: Node) -> tuple[bool, str]:
+    """Whether node sits in an import statement, and the name it is imported as when the import renames it."""
+    alias = ""
+    current = node
+    while current is not None:
+        if current.type in RENAMES and not alias:
+            name, new = current.child_by_field_name("name"), current.child_by_field_name("alias")
+            if name is not None and new is not None and node.end_byte == name.end_byte:  # `y` in `x.y as z`
+                alias = new.text.decode("utf-8")
+        if current.type in IMPORTS or (current.type == "export_statement" and current.child_by_field_name("source")):
+            return True, alias
+        current = current.parent
+    return False, ""
+
+
+def _runtime_class(node: Node) -> str:
+    """ "cls" for the callee of `cls(...)`, "type(self)" for `type` in `type(self)(...)`, else ""."""
+    call = node.parent
+    if node.type != "identifier" or call is None or call.type != "call" or call.child_by_field_name("function") != node:
+        return ""
+    if node.text == b"cls":
+        return "cls"
+    arguments = call.child_by_field_name("arguments")
+    outer = call.parent
+    if (
+        node.text == b"type"
+        and arguments is not None
+        and [a.text for a in arguments.named_children] == [b"self"]
+        and outer is not None
+        and outer.type == "call"
+        and outer.child_by_field_name("function") == call
+    ):
+        return "type(self)"
+    return ""
 
 
 def _object_holder(node: Node) -> str | None:
