@@ -16,7 +16,7 @@ make them pass.
 - [x] 3. `constructs.py` and the two query files: constructs with
   qualified names and innermost nesting, identifier sites, byte-to-character
   columns, syntax-error lines. (AC-1 to AC-3 groundwork, AC-8, AC-9, AC-19)
-- [ ] 4. Classification against the diff: changed, added, removed, with
+- [x] 4. Classification against the diff: changed, added, removed, with
   innermost attribution of changed lines. (AC-1, AC-2, AC-3, AC-10)
 - [ ] 5. Python resolver: `definition_at` and reference search with jedi,
   and the verdict rules. (AC-4 to AC-7 for Python)
