@@ -5,7 +5,7 @@ and names the criteria it moves toward passing. The acceptance tests
 (stage 4) are written and approved before task 2 starts; tasks 2 to 9
 make them pass.
 
-- [ ] 1. Move the merge-base diff into `groundwork_config.py`
+- [x] 1. Move the merge-base diff into `groundwork_config.py`
   (`merge_base`, `diff_against`), and switch `detect_workarounds.py` and
   `check_ac_coverage.py` to it. A refactor with no behaviour change: the
   existing tests pass unchanged. (prerequisite; research's duplicate)

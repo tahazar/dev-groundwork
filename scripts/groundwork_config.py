@@ -1,4 +1,4 @@
-"""Shared helpers for the dev-groundwork scripts: project root, config, globs.
+"""Shared helpers for the dev-groundwork scripts: project root, config, globs, diffs.
 
 Standard library only, so the scripts run in any project and in CI without
 installing anything.
@@ -108,3 +108,26 @@ def walk_files(root: Path):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for name in filenames:
             yield Path(dirpath) / name
+
+
+def merge_base(root: Path, base: str) -> str:
+    """The commit where HEAD branched from `base`.
+
+    Raises subprocess.CalledProcessError, with git's stderr, when `base` is
+    not a known ref.
+    """
+    return subprocess.run(
+        ["git", "merge-base", base, "HEAD"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def diff_against(root: Path, base: str, *args: str) -> str:
+    """`git diff` from `base` to the working tree.
+
+    `args` are diff options, optionally followed by `--` and paths; `base`
+    goes between them. Raises subprocess.CalledProcessError on git failure.
+    """
+    split = args.index("--") if "--" in args else len(args)
+    return subprocess.run(
+        ["git", "diff", *args[:split], base, *args[split:]], cwd=root, capture_output=True, text=True, check=True
+    ).stdout

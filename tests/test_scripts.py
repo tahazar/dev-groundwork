@@ -21,7 +21,7 @@ import check_citations  # noqa: E402
 import detect_workarounds  # noqa: E402
 import hook_commit_gate  # noqa: E402
 import hook_guard_tests  # noqa: E402
-from groundwork_config import glob_match, load_config  # noqa: E402
+from groundwork_config import diff_against, glob_match, load_config, merge_base  # noqa: E402
 
 
 def git(root: Path, *args: str) -> None:
@@ -74,6 +74,55 @@ class GlobTests(unittest.TestCase):
 
     def test_source_file_is_not_a_test(self):
         self.assertFalse(glob_match("src/latest.ts", "**/*.test.*"))
+
+
+class DiffHelperTests(unittest.TestCase):
+    """merge_base and diff_against, shared by the check scripts."""
+
+    def setUp(self):
+        self.repo = Repo()
+        self.repo.write("src/a.py", "a = 1\n")
+        self.repo.write("docs/b.md", "b\n")
+        self.repo.commit("base")
+        git(self.repo.root, "branch", "base")
+        self.fork = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=self.repo.root, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    def tearDown(self):
+        self.repo.close()
+
+    def test_merge_base_is_the_fork_point_after_the_base_moves_on(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.commit("feature")
+        git(self.repo.root, "checkout", "-q", "base")
+        self.repo.write("src/c.py", "c = 1\n")
+        self.repo.commit("base moves on")
+        git(self.repo.root, "checkout", "-q", "main")
+        self.assertEqual(merge_base(self.repo.root, "base"), self.fork)
+
+    def test_diff_against_includes_committed_and_uncommitted_changes(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.commit("feature")
+        self.repo.write("docs/b.md", "changed\n")
+        names = diff_against(self.repo.root, self.fork, "--name-only")
+        self.assertEqual(names.splitlines(), ["docs/b.md", "src/a.py"])
+
+    def test_diff_against_puts_paths_after_the_base(self):
+        self.repo.write("src/a.py", "a = 2\n")
+        self.repo.write("docs/b.md", "changed\n")
+        self.assertEqual(diff_against(self.repo.root, self.fork, "--name-only", "--", "src"), "src/a.py\n")
+        diff = diff_against(self.repo.root, self.fork, "-U0", "--", "src/a.py")
+        self.assertIn("-a = 1\n+a = 2\n", diff)
+        self.assertNotIn("docs/b.md", diff)
+
+    def test_unknown_base_raises_with_git_message(self):
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            merge_base(self.repo.root, "no-such-ref")
+        self.assertIn("no-such-ref", caught.exception.stderr)
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            diff_against(self.repo.root, "no-such-ref", "--name-only")
+        self.assertIn("no-such-ref", caught.exception.stderr)
 
 
 class CitationTests(unittest.TestCase):
