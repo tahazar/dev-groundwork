@@ -496,7 +496,7 @@ def classify(
 def main(argv: list[str] | None = None) -> int:
     """Build the map; write --out files; with --post, comment and write the summary (design, steps 9 and 10).
 
-    Without --post, a missing --base or a failing git exits 2. With --post every
+    Without --post, a missing --base, a failing git or an unwritable --out exits 2. With --post every
     failure is reported on the pull request and the exit code is 0 (AC-20, AC-21).
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -510,10 +510,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("the following arguments are required: --base")
     try:
         data = build_map(project_root(), args.base)
+        _write_out(args.out, data, render.render_comment(data, ""))
     except MapError as exc:
         print(f"pr-map: {exc}", file=sys.stderr)
         return 2
-    _write_out(args.out, data, render.render_comment(data, ""))
     return 0
 
 
@@ -522,8 +522,15 @@ def _post(args: argparse.Namespace) -> int:
     try:
         ctx = github.context(os.environ)
     except github.ContextError as exc:
-        # Nothing can be posted or summarised without the Actions environment; the log is all there is.
+        # No comment can be posted without the Actions environment; the summary, when there is one, says why.
         log.error("pr-map cannot post: %s", exc)
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            try:
+                with open(summary, "a", encoding="utf-8") as out:
+                    out.write(f"pr-map could not build the map: {exc}\n")
+            except OSError:
+                log.exception("writing the job summary %s", summary)
         return 0
     try:
         if args.base is None:

@@ -38,6 +38,8 @@ class Server:
         self.max_body: int | None = None
         self.write_status = write_status  # answer every write with this status, when set
         self.list_status = list_status  # answer every listing with this status, when set
+        self.drop_writes = False  # close the connection on every write without answering
+        self.list_payload: object = None  # answer every listing with this instead of the comments, when set
         server = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -57,6 +59,8 @@ class Server:
                 url = urlsplit(self.path)
                 if server.list_status:
                     return self.reply(server.list_status, {"message": "Forbidden"})
+                if server.list_payload is not None:
+                    return self.reply(200, server.list_payload)
                 if url.path != COMMENTS:
                     return self.reply(404, {"message": "Not Found"})
                 page = int(parse_qs(url.query)["page"][0])
@@ -66,6 +70,9 @@ class Server:
                 server.requests.append((self.command, self.path))
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))["body"]
                 server.bodies.append(body)
+                if server.drop_writes:
+                    self.close_connection = True
+                    return None
                 if server.write_status:
                     self.reply(server.write_status, {"message": "Refused"})
                     return None
@@ -261,6 +268,29 @@ class RefusedTests(GitHubTestCase):
         self.assertIn("HTTP 500", self.summary_text())
 
 
+class BrokenAPITests(GitHubTestCase):
+    def test_dropped_connection_still_writes_the_map_to_the_summary(self):
+        server = self.server()
+        server.drop_writes = True
+        status = self.publish(server, ["the map"], warns=True)
+        self.assertIn("no response", status)
+        self.assertIn("the map", self.summary_text())
+
+    def test_listing_that_is_not_a_list_is_named(self):
+        server = self.server()
+        server.list_payload = {"message": "odd"}
+        self.publish(server, ["the map"], warns=True)
+        self.assertEqual(server.bodies, [])
+        self.assertIn("expected a list of comments", self.summary_text())
+        self.assertIn("the map", self.summary_text())
+
+    def test_rejected_failure_message_is_not_called_every_version(self):
+        server = self.server()
+        server.max_body = 10
+        status = self.publish(server, ["pr-map could not build the map: boom"], warns=True)
+        self.assertIn("rejected the comment.", status)
+
+
 class SummaryTests(GitHubTestCase):
     def test_map_within_the_limit_is_written_whole(self):
         github.write_summary(self.summary, "Posted.", "x" * 1000, "https://run")
@@ -375,8 +405,24 @@ class EntryPointTests(unittest.TestCase):
         self.assertIn("could not build the map: reading the arguments: --base is required", server.comments[0]["body"])
         self.assertIn("--base is required", (tmp / "summary.md").read_text(encoding="utf-8"))
 
+    def test_missing_variable_is_written_to_the_summary_when_there_is_one(self):
+        summary = Path(tempfile.mkdtemp()) / "summary.md"
+        env = {"GITHUB_EVENT_PATH": "", "GITHUB_STEP_SUMMARY": str(summary)}
+        with mock.patch.dict(os.environ, env), self.assertLogs("pr_map", "ERROR"):
+            self.assertEqual(pr_map.main(["--base", "base", "--post"]), 0)
+        self.assertIn("could not build the map: reading the Actions environment", summary.read_text(encoding="utf-8"))
+
+    def test_unwritable_out_exits_2_without_post(self):
+        blocker = Path(tempfile.mkdtemp()) / "file"
+        blocker.write_text("", encoding="utf-8")
+        err = io.StringIO()
+        with redirect_stderr(err):
+            self.assertEqual(pr_map.main(["--base", "base", "--out", str(blocker / "out")]), 2)
+        self.assertIn("writing the map to", err.getvalue())
+
     def test_missing_actions_environment_exits_0_with_post(self):
-        with mock.patch.dict(os.environ, {"GITHUB_EVENT_PATH": ""}), self.assertLogs("pr_map", "ERROR") as logs:
+        env = {"GITHUB_EVENT_PATH": "", "GITHUB_STEP_SUMMARY": ""}
+        with mock.patch.dict(os.environ, env), self.assertLogs("pr_map", "ERROR") as logs:
             self.assertEqual(pr_map.main(["--base", "base", "--post"]), 0)
         self.assertIn("GITHUB_EVENT_PATH is not set", logs.output[0])
 

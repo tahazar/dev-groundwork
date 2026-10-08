@@ -9,6 +9,7 @@ the body (422), smaller versions are tried in turn.
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import urllib.error
@@ -36,7 +37,7 @@ class GitHubError(RuntimeError):
     """A request to the GitHub API failed. status is the HTTP status, or None when no response came."""
 
     def __init__(self, action: str, status: int | None, response: str):
-        super().__init__(f"{action}: {f'HTTP {status}' if status else 'no response'}: {response}")
+        super().__init__(f"{action}: {'no response' if status is None else f'HTTP {status}'}: {response}")
         self.status = status
         self.response = response
 
@@ -98,7 +99,12 @@ def publish(ctx: Context, versions: list[str]) -> str:
     versions[0] is the complete map; it always goes to the summary (AC-14,
     AC-18). The returned status line is also the summary's first line.
     """
-    status = post_comment(ctx, versions)
+    try:
+        status = post_comment(ctx, versions)
+    except Exception as exc:
+        # An error post_comment does not expect still leaves the summary with the map and the reason.
+        log.exception("posting the comment on pull request #%d", ctx.number)
+        status = f"No comment was posted on pull request #{ctx.number}: {exc}. The map is below."
     write_summary(ctx.summary, status, versions[0], ctx.run_url)
     return status
 
@@ -143,9 +149,9 @@ def post_comment(ctx: Context, versions: list[str]) -> str:
                 f"{action} the map comment on {where} with a shortened version (GitHub rejected "
                 f"{number} longer version{'s' if number != 1 else ''} with 422). The complete map is below."
             )
+        tried = "every version of the comment, down to the header and counts" if len(versions) > 1 else "the comment"
         return (
-            f"No comment was posted on {where}: GitHub rejected every version of the comment, down to the "
-            f"header and counts. The last response: {last}. The map is below."
+            f"No comment was posted on {where}: GitHub rejected {tried}. The last response: {last}. The map is below."
         )
     except GitHubError as exc:
         # Fallback: a token without write access (403) or an API failure; the summary holds the map and why.
@@ -163,6 +169,8 @@ def find_comment(api: Client, comments: str) -> int | None:
     page = 1
     while True:
         found = api.request("GET", f"{comments}?per_page={PER_PAGE}&page={page}", None, "listing the comments")
+        if not isinstance(found, list):
+            raise GitHubError("listing the comments", None, f"expected a list of comments, got {found!r:.200}")
         if not found:
             return None
         for comment in found:
@@ -217,5 +225,6 @@ class Client:
                 return json.loads(response.read() or b"null")
         except urllib.error.HTTPError as exc:
             raise GitHubError(action, exc.code, exc.read().decode("utf-8", "replace").strip()) from exc
-        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            # URLError and TimeoutError are OSErrors; a dropped connection raises http.client's own errors.
             raise GitHubError(action, None, str(exc)) from exc
