@@ -1,7 +1,7 @@
 # Requirements: pr-map
 
-- Status: revision 2 awaiting approval (revision 1 approved 2026-10-07, by
-  the owner)
+- Status: approved (revision 2: 2026-10-08, by the owner; revision 1:
+  2026-10-07, by the owner)
 - Requested by: the owner, 2026-10-07: "adding a GitHub action to generate a
   visual in our PRs to enable quick code reviews", inspired by Etchpad
   ("every wire a reference that actually exists ... never hallucinated").
