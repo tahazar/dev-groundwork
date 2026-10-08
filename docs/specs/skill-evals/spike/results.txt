@@ -1,0 +1,155 @@
+# Spike results, 2026-10-08, Claude Code 2.1.294, in a claude.ai cloud container
+# (auth from the host, no ANTHROPIC_API_KEY). Produced by summarize.py from the
+# stream-json files of headless_spike.sh (spike1), isolation_spike.sh (spike2),
+# question_spike.sh (spike3) and limits_spike.sh (spike4). Raw files not kept:
+# they hold account and container details.
+
+== spike1/with-plugin.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=dontAsk apiKeySource=none
+init: plugins=['dev-groundwork@inline', 'cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=44 dev-groundwork skills=['dev-groundwork:acceptance-tests', 'dev-groundwork:debug', 'dev-groundwork:design', 'dev-groundwork:implement', 'dev-groundwork:requirements', 'dev-groundwork:research', 'dev-groundwork:review', 'dev-groundwork:setup', 'dev-groundwork:test-first']
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant tool_use: name=Read input={"file_path": "<tmpdir>/a.txt"}
+user tool_result: is_error=None content='1\thello\n2\t'
+assistant text: 'hello'
+result: subtype=success is_error=False num_turns=2 total_cost_usd=0.0029904700000000003 duration_ms=2498 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='hello'
+== spike1/without-plugin.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=dontAsk apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant tool_use: name=Read input={"file_path": "<tmpdir>/a.txt"}
+user tool_result: is_error=None content='1\thello\n2\t'
+assistant text: 'hello'
+result: subtype=success is_error=False num_turns=2 total_cost_usd=0.00244373 duration_ms=2461 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='hello'
+== spike2/nosources-with.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['dev-groundwork@inline', 'cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=30 dev-groundwork skills=['dev-groundwork:acceptance-tests', 'dev-groundwork:debug', 'dev-groundwork:design', 'dev-groundwork:implement', 'dev-groundwork:requirements', 'dev-groundwork:research', 'dev-groundwork:review', 'dev-groundwork:setup', 'dev-groundwork:test-first']
+init: tools=0 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'OK'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=3.5969999999999996e-05 duration_ms=2361 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='OK'
+== spike2/nosources-without.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=21 dev-groundwork skills=[]
+init: tools=0 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'OK'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=3.5969999999999996e-05 duration_ms=2335 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='OK'
+== spike2/safe-with.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['dev-groundwork@inline', 'cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=21 dev-groundwork skills=[]
+init: tools=0 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'OK'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=3.5969999999999996e-05 duration_ms=1998 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='OK'
+== spike2/safe-without.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=21 dev-groundwork skills=[]
+init: tools=0 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'OK'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=0.0005759500000000001 duration_ms=2164 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='OK'
+== spike3/ask.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: "Which colour do you prefer? Pick one from red, blue, green, purple, orange, or black, or name your own. I'll wait for your answer before going further."
+result: subtype=success is_error=False num_turns=1 total_cost_usd=0.00211172 duration_ms=2341 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result="Which colour do you prefer? Pick one from red, blue, green, purple, orange, or black, or name your own. I'll wait for your answer before going further."
+== spike3/resume.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'Blue'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=0.00249342 duration_ms=4039 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='Blue'
+== spike3/stdin.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'Green'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=0.00252763 duration_ms=5040 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='Green'
+== spike4/maxturns.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=dontAsk apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant tool_use: name=Read input={"file_path": "<tmpdir>/a.txt"}
+user tool_result: is_error=None content='1\thello\n2\t'
+result: subtype=error_max_turns is_error=True num_turns=2 total_cost_usd=0.00207682 duration_ms=791 terminal_reason=max_turns permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='None'
+== spike4/remember1.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=0 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'Are you ready?'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=0.0004029200000000001 duration_ms=600 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='Are you ready?'
+== spike4/remember2.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=default apiKeySource=none
+init: plugins=['cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=35 dev-groundwork skills=[]
+init: tools=0 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant text: 'PELICAN'
+result: subtype=success is_error=False num_turns=1 total_cost_usd=0.0006864400000000002 duration_ms=2081 terminal_reason=completed permission_denials=[]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='PELICAN'
+
+== exit codes
+safe-without exit 0
+safe-with exit 0
+nosources-without exit 0
+nosources-with exit 0
+ask exit 0
+resume exit 0
+stdin exit 0
+maxturns exit 1
+remember1 exit 0
+remember2 exit 0
+
+== spike1 tool_use block as recorded (with-plugin)
+{"type": "tool_use", "name": "Read", "input": {"file_path": "<tmpdir>/a.txt"}}
+
+== spike1 result usage fields (with-plugin)
+modelUsage: {"inputTokens": 1189, "outputTokens": 92, "cacheReadInputTokens": 59717, "cacheCreationInputTokens": 11142, "costUSD": 0.0029904700000000003, "costBasis": "list"}
+
+== built-in skills present in the without-plugin arm whose names match dev-groundwork skills
+same-name skills without plugin: ['debug', 'design']
+
+== skills left in the without-plugin arm under --setting-sources "" (spike2)
+nosources-without skills: ['artifact-capabilities', 'artifact-diagramming', 'batch', 'claude-api', 'code-review', 'dataviz', 'debug', 'deep-research', 'design', 'design-sync', 'doctor', 'fewer-permission-prompts', 'loop', 'plugin-authoring', 'run', 'run-skill-generator', 'simplify', 'slides', 'update-config', 'verify', 'workflow-authoring']
