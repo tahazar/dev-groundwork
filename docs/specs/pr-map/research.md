@@ -74,6 +74,79 @@ incomplete, not as "no callers". MIT licensed (C25).
 command line only reports diagnostics; references need its language
 server (C18). Rejected for version 1.
 
+## Addendum for the design: go to definition
+
+Added 2026-10-07 during design, because the design asks "which definition
+does this call point to?" at each call site, which research had not
+measured.
+
+- TypeScript's LanguageService declares `getDefinitionAtPosition` (C36).
+  Inside one package it found the exact local function (C37).
+- A call into another workspace package resolved to that package's built
+  declaration file under `dist`, not its source (C38), and only works
+  after a build. Pointing the compiler option `paths` (C39) at the
+  package's source entry resolved the same call to the source definition,
+  with no build (C40).
+- jedi's `goto` follows imports when asked (C41) and resolved three calls
+  named `save_record` to the two different functions they mean (C42).
+
+## Addendum for the design: references through aliases and hierarchies
+
+Added 2026-10-07 after the design review asked whether reference search
+sees calls that a name match cannot.
+
+- TypeScript `findReferences` found the call through a renamed import
+  (`rc()`), the call through a default import under another name
+  (`loader()`), and a call on an interface two levels above the changed
+  method (`b.run()` where `Impl extends Mid implements Base`) (C43, C44,
+  C45).
+- jedi `get_references` found only the renamed import line, not the call
+  `save()` through it (C46). pr-map has to follow the alias itself.
+- GitHub Actions: `continue-on-error` on a step keeps the job from failing
+  (C47); a newer run in a concurrency group cancels a pending one (C48);
+  `actions/checkout` documents checking out the pull request's head commit
+  instead of the merge commit (C49).
+
+## Addendum for the design: constructors, overloads and uninstalled libraries
+
+Added 2026-10-07 after the third design review.
+
+- **Constructors.**
+  - jedi `get_references` on `__init__` returned only the definition, not
+    the call `Foo(1)` (C50).
+  - jedi `goto` on `Foo(1)` lands on the class (C51).
+  - TypeScript `getDefinitionAtPosition` on `new Foo(1)` returns both the
+    class and its constructor (C52).
+  - `findReferences` on the constructor finds `new Foo` (C53).
+- **Object literals.** `findReferences` on a method of an object literal
+  typed by an interface found calls through the interface and through
+  the literal itself (C54).
+- **Overloads.** `getDefinitionAtPosition` on an overloaded call returned
+  only the matching overload signature (C55).
+- **Uninstalled libraries.** With the library not installed:
+  - jedi `goto` on `np.mean` returned nothing (C56);
+  - TypeScript resolved `Command` from `"commander"` to the import in
+    the calling file (C57).
+
+## Addendum for the design: inferred parameters, super, subclasses and assignability
+
+Added 2026-10-07 after the fifth design review.
+
+- **Inferred parameter types.** jedi's settings turn on `dynamic_params`
+  and `dynamic_params_for_other_modules` by default (C58, C59). With them
+  on, `goto` on `obj.save()` for an untyped parameter answered one class's
+  method although two classes are passed in; with them off it answered
+  nothing (C60).
+- **`super` and `new this` in TypeScript.** `getDefinitionAtPosition` on
+  `super(2)` answers the base constructor and its class (C61).
+  `findReferences` on the base constructor found `new this(1)`,
+  `super(2)`, and `new Plain(3)` for a subclass without its own
+  constructor (C62).
+- **Assignability.** TypeScript 5.9.3's type checker declares
+  `isTypeAssignableTo` (C63). It reported a same-named but incompatible
+  class as not assignable to an interface, and a matching one as
+  assignable (C64).
+
 ## Answers to open questions
 
 - Package line above the diagram: deferred to the owner after version 1, as
@@ -334,4 +407,158 @@ server (C18). Rejected for version 1.
   tier: 1
   quote: "(module (expression_statement (assignment left: (identifier) @name) @definition.constant))"
   retrieved: 2026-10-07
+- id: C36
+  claim: TypeScript 5.9.3's LanguageService declares getDefinitionAtPosition(fileName, position).
+  source: https://raw.githubusercontent.com/microsoft/TypeScript/v5.9.3/src/services/types.ts
+  tier: 1
+  quote: "getDefinitionAtPosition(fileName: string, position: number): readonly DefinitionInfo[] | undefined;"
+  retrieved: 2026-10-07
+- id: C37
+  claim: getDefinitionAtPosition resolved a call to readClipIfPresent to its local definition at line 2278.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "packages/cli/src/index.ts:2278 local function readClipIfPresent"
+- id: C38
+  claim: Without a paths override, a CLI call to parseNotation resolved to core's built declaration file.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "packages/cli/node_modules/@awh/core/dist/notation/barbeat.d.ts:39 function parseNotation"
+- id: C39
+  claim: TypeScript 5.9.3's compiler options include paths.
+  source: https://raw.githubusercontent.com/microsoft/TypeScript/v5.9.3/src/compiler/types.ts
+  tier: 1
+  quote: "paths?: MapLike<string[]>;"
+  retrieved: 2026-10-07
+- id: C40
+  claim: With paths pointing @awh/core at core's source entry, the same call resolved to the source definition.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "packages/core/src/notation/barbeat.ts:98 function parseNotation"
+- id: C41
+  claim: jedi's goto can follow imports.
+  source: https://raw.githubusercontent.com/davidhalter/jedi/master/jedi/api/__init__.py
+  tier: 1
+  quote: ":param follow_imports: The method will follow imports."
+  retrieved: 2026-10-07
+- id: C42
+  claim: jedi's goto resolved the call at line 589 named save_record to drumstats.py rather than report.py.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "save_record at awh_analysis/__main__.py:589 -> ['awh_analysis/drumstats.py:372']"
+- id: C43
+  claim: findReferences on readClip found the call through the renamed import rc.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: named export readClip: uses in use.ts = [ '1:18 "readClip"', '1:30 "rc"', '2:59 "rc"' ]
+- id: C44
+  claim: findReferences on a default export found the call through a differently named default import.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: default export loadSet: uses in use.ts = [ '1:8 "loader"', '2:66 "loader"' ]
+- id: C45
+  claim: findReferences on Impl.run found a call made through the Base interface two levels up.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: Impl.run: uses in use.ts = [ '2:45 "run"' ]
+- id: C46
+  claim: jedi get_references on save_record returned only the renamed import line, not the call through the alias.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi save_record via renamed import: [('use.py', 1, 19, 'save_record')]"
+- id: C47
+  claim: continue-on-error on a step keeps the job from failing when that step fails.
+  source: https://raw.githubusercontent.com/github/docs/main/content/actions/reference/workflows-and-actions/workflow-syntax.md
+  tier: 1
+  quote: Prevents a job from failing when a step fails. Set to `true` to allow a job to pass when this step fails.
+  retrieved: 2026-10-07
+- id: C48
+  claim: In a concurrency group, a newly queued run cancels an existing pending run.
+  source: https://raw.githubusercontent.com/github/docs/main/data/reusables/actions/actions-group-concurrency.md
+  tier: 1
+  quote: Any existing `pending` job or workflow in the same concurrency group, if it exists, will be canceled and the new queued job or workflow will take its place.
+  retrieved: 2026-10-07
+- id: C49
+  claim: actions/checkout documents checking out the pull request head commit instead of the merge commit.
+  source: https://raw.githubusercontent.com/actions/checkout/main/README.md
+  tier: 1
+  quote: Checkout pull request HEAD commit instead of merge commit
+  retrieved: 2026-10-07
+- id: C50
+  claim: jedi get_references on Foo.__init__ returned only its definition, not the call Foo(1).
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi get_references Foo.__init__: [('lib.py', 2, 8)]"
+- id: C51
+  claim: jedi goto on the call Foo(1) lands on class Foo.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi goto Foo(1): [('lib.py', 1, 6, 'class')]"
+- id: C52
+  claim: TypeScript getDefinitionAtPosition on new Foo returns both the class and its constructor.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: getDefinitionAtPosition new Foo: [ 'lib.ts:2:14 class', 'lib.ts:2:20 constructor' ]
+- id: C53
+  claim: TypeScript findReferences on a constructor found the new Foo expression.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: findReferences constructor: uses in use.ts = [ 'use.ts:3:51 "Foo"' ]
+- id: C54
+  claim: findReferences on a method of an object literal typed by an interface found two calls in use.ts.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: findReferences fake.run (object literal): uses in use.ts = [ 'use.ts:3:64 "run"', 'use.ts:3:73 "run"' ]
+- id: C55
+  claim: getDefinitionAtPosition on an overloaded call returned only one overload signature.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "getDefinitionAtPosition ov(1): [ 'lib.ts:5:17 function' ]"
+- id: C56
+  claim: With numpy not installed, jedi goto on np.mean returned nothing.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi goto np.mean: []"
+- id: C57
+  claim: With commander not installed, TypeScript resolved Command to the import alias in the calling file.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "getDefinitionAtPosition Command (bare specifier, not installed): [ 'use.ts:1:10 alias' ]"
+- id: C58
+  claim: jedi enables dynamic_params by default.
+  source: https://raw.githubusercontent.com/davidhalter/jedi/master/jedi/settings.py
+  tier: 1
+  quote: dynamic_params = True
+  retrieved: 2026-10-07
+- id: C59
+  claim: jedi enables dynamic_params_for_other_modules by default.
+  source: https://raw.githubusercontent.com/davidhalter/jedi/master/jedi/settings.py
+  tier: 1
+  quote: dynamic_params_for_other_modules = True
+  retrieved: 2026-10-07
+- id: C60
+  claim: With dynamic params off, jedi goto on a method call on an untyped parameter answered nothing.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "jedi goto obj.save, dynamic_params=False: []"
+- id: C61
+  claim: getDefinitionAtPosition on super(2) answers the base constructor and its class.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "getDefinitionAtPosition super(2): [ 'lib.ts:4:20 constructor', 'lib.ts:4:14 class' ]"
+- id: C62
+  claim: findReferences on a base constructor found new this, super, and a subclass without its own constructor.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: findReferences Foo constructor: [ 'lib.ts:4:85 "this"', 'lib.ts:5:48 "super"', 'lib.ts:8:45 "Plain"' ]
+- id: C63
+  claim: TypeScript 5.9.3's TypeChecker declares isTypeAssignableTo.
+  source: https://raw.githubusercontent.com/microsoft/TypeScript/v5.9.3/src/compiler/types.ts
+  tier: 1
+  quote: "isTypeAssignableTo(source: Type, target: Type): boolean;"
+  retrieved: 2026-10-07
+- id: C64
+  claim: isTypeAssignableTo reported an incompatible same-named class as not assignable to the interface.
+  source: file:docs/specs/pr-map/spike/results.txt
+  tier: 1
+  quote: "isTypeAssignableTo(Runner, Task): false"
 ```
