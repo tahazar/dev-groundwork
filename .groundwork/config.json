@@ -1,6 +1,6 @@
 {
   "specDir": "docs/specs",
-  "testGlobs": ["tests/**"],
+  "testGlobs": ["tests/**", "tests_pr_map/**"],
   "onCommit": "ruff check . && ruff format --check . && python3 -m unittest discover tests -q",
   "sources": {
     "tier1": ["code.claude.com", "docs.anthropic.com", "www.anthropic.com", "github.com", "raw.githubusercontent.com", "docs.python.org"],
