@@ -94,9 +94,9 @@ Failure
 
 Setup
 
-- **AC-22** When `/dev-groundwork:setup` runs in a project, it shall add the
-  map's workflow and script to the project alongside the existing
-  Groundwork checks. (deferred until the map works in one project)
+- **AC-22** (deferred) When `/dev-groundwork:setup` runs in a project, it
+  shall add the map's workflow and script to the project alongside the
+  existing Groundwork checks. Deferred until the map works in one project.
 
 ## Out of scope
 
