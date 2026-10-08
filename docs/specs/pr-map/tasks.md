@@ -24,7 +24,7 @@ make them pass.
   workspace packages, and the Python side of the protocol, including the
   fallback when Node or the helper is unavailable. (AC-4 to AC-7 for
   TypeScript)
-- [ ] 7. Graph assembly: candidates from both sources, verdicts, callers of
+- [x] 7. Graph assembly: candidates from both sources, verdicts, callers of
   removed boxes, overrides and implementations, unresolved calls, JSON
   output. (AC-3, AC-4, AC-6, AC-7, AC-11)
 - [ ] 8. `render.py`: Mermaid diagrams, splitting under the budgets, the
