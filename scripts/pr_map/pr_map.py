@@ -12,8 +12,9 @@ GITHUB_SERVER_URL, GITHUB_RUN_ID).
 
 Design: docs/specs/pr-map/design.md. build_map runs Pipeline steps 1 to 6:
 the boxes, then the arrows between them and their neighbours (connect).
-render.render_comment writes the comment body (step 8). Posting is still a
-stub; the acceptance tests in tests_pr_map/ define its behaviour.
+render writes the comment body and its shorter versions (step 8), and
+github posts it and writes the job summary (step 9). main is step 10: with
+--post, any failure is posted and the exit code is 0.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -29,6 +31,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import constructs
+import github
 import render
 import resolve
 from constructs import Construct, FileConstructs, Site
@@ -491,17 +494,68 @@ def classify(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Build the map; write --out files; with --post, comment and write the summary (design, steps 9 and 10).
+
+    Without --post, a missing --base or a failing git exits 2. With --post every
+    failure is reported on the pull request and the exit code is 0 (AC-20, AC-21).
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--base", required=True)
+    parser.add_argument("--base")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--post", action="store_true")
     args = parser.parse_args(argv)
-    if args.out:
-        args.out.mkdir(parents=True, exist_ok=True)
+    if args.post:
+        return _post(args)
+    if args.base is None:
+        parser.error("the following arguments are required: --base")
+    try:
         data = build_map(project_root(), args.base)
-        (args.out / "pr-map.json").write_text(json.dumps(data), encoding="utf-8")
-        (args.out / "pr-map.md").write_text(render.render_comment(data, ""), encoding="utf-8")
+    except MapError as exc:
+        print(f"pr-map: {exc}", file=sys.stderr)
+        return 2
+    _write_out(args.out, data, render.render_comment(data, ""))
     return 0
+
+
+def _post(args: argparse.Namespace) -> int:
+    """The --post path: always exits 0, so the map never fails a pull request's checks (AC-21)."""
+    try:
+        ctx = github.context(os.environ)
+    except github.ContextError as exc:
+        # Nothing can be posted or summarised without the Actions environment; the log is all there is.
+        log.error("pr-map cannot post: %s", exc)
+        return 0
+    try:
+        if args.base is None:
+            raise MapError("reading the arguments: --base is required")
+        data = build_map(project_root(), args.base)
+        data["head"] = ctx.head_sha  # the pull request's head commit, not GitHub's merge commit (AC-17)
+        versions = render.comment_versions(data, ctx.run_url)
+        _write_out(args.out, data, versions[0])
+    except MapError as exc:
+        log.error("pr-map could not build the map: %s", exc)
+        versions = [f"pr-map could not build the map: {exc}"]
+    except Exception as exc:
+        # The top-level catch (design, step 10): whatever is left is posted as the map's failure.
+        log.exception("pr-map could not build the map")
+        versions = [f"pr-map could not build the map: {exc}"]
+    try:
+        log.info("%s", github.publish(ctx, versions))
+    except Exception:
+        log.exception("pr-map could not post the map")
+    return 0
+
+
+def _write_out(out: Path | None, data: dict, comment: str) -> None:
+    """Write pr-map.json (the map) and pr-map.md (the complete comment) to out, the artifact's directory."""
+    if out is None:
+        return
+    try:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "pr-map.json").write_text(json.dumps(data), encoding="utf-8")
+        (out / "pr-map.md").write_text(comment, encoding="utf-8")
+    except OSError as exc:
+        raise MapError(f"writing the map to {out}: {exc}") from exc
 
 
 def _source(path: str | None) -> str | None:
@@ -529,11 +583,13 @@ def _git(root: Path, *args: str) -> str:
 
 
 def _git_step(action: str, run, *args):
-    """Run a git helper; on failure raise MapError naming the action, with git's stderr and the cause."""
+    """Run a git helper; on failure, or with git missing, raise MapError naming the action and keeping the cause."""
     try:
         return run(*args)
     except subprocess.CalledProcessError as exc:
         raise MapError(f"{action}: {_reason(exc)}") from exc
+    except OSError as exc:
+        raise MapError(f"{action}: cannot run git: {exc}") from exc
 
 
 def _reason(exc: Exception) -> str:
