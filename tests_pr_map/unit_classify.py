@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "pr_
 import constructs
 import pr_map
 from helpers import MapRepo
+from test_scripts import git
 
 
 def parse(path: str, text: str) -> constructs.FileConstructs:
@@ -157,6 +158,12 @@ class BuildMapTests(unittest.TestCase):
         self.repo.head({"new.py": body.replace("return 3", "return 33")})
         data = pr_map.build_map(self.repo.root, "base")
         self.assertEqual([(b["id"], b["status"]) for b in data["boxes"]], [("new.py::f3", "changed")])
+
+    def test_external_diff_driver_is_not_used(self):
+        self.repo.base({"lib.py": "def f():\n    return 1\n"})
+        self.repo.head({"lib.py": "def f():\n    return 2\n"})
+        git(self.repo.root, "config", "diff.external", "true")
+        self.assertEqual([b["id"] for b in pr_map.build_map(self.repo.root, "base")["boxes"]], ["lib.py::f"])
 
     def test_records_base_and_head_commits(self):
         self.repo.base({"lib.py": "def f():\n    return 1\n"})

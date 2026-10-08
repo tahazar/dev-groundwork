@@ -97,6 +97,7 @@ def build_map(root: Path, base: str) -> dict:
                 "-U0",
                 "-M",
                 "--no-color",
+                "--no-ext-diff",
                 "--",
                 *dict.fromkeys((change.old, change.new)),
             )
