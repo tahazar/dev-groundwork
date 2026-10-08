@@ -182,8 +182,9 @@ def connect(
 
     answers = Answers(resolver)
     live: dict[str, list[str]] = defaultdict(list)  # match key -> live construct ids, for unresolved callees
+    defined = set(code.positions.values())
     for c in code.constructs.values():
-        if c.id in code.positions.values():
+        if c.id in defined:
             live[_short(c)].append(c.id)
     arrows: dict[tuple[str, str, str], Arrow] = {}
     notes: dict[str, dict[str, dict]] = defaultdict(dict)  # kind -> site -> entry: one entry per site
@@ -196,7 +197,8 @@ def connect(
             key = (source, v.target, at)
             if key not in arrows or arrows[key].certainty == "possible":
                 arrows[key] = Arrow(source, v.target, v.certainty, at, v.reason)
-        elif v.note == "library" and at not in library_sites:
+        elif v.note == "library" and candidate.call and at not in library_sites:
+            # Counted once per call: `np` in `np.mean(xs)` is the same library call as `mean`.
             library_sites.add(at)
             library[candidate.path] += 1
         elif v.note == "refers" and v.refers_to != f"{candidate.path}:{candidate.line}":
@@ -305,12 +307,7 @@ class Candidates:
         keys.add(_short(cls))
         if Path(target.path).suffix != ".py":
             return keys, set()  # findReferences finds subclass calls, `super(...)` and `new this` (C62)
-        try:
-            runners = set(resolve.runners(cls.id, _short(target), self.code))
-        except ValueError as exc:
-            # A hierarchy Python itself rejects has no runners to name; the class's own name still matches.
-            log.warning("ordering the subclasses of %s: %s", cls.id, exc)
-            runners = {cls.id}
+        runners = set(resolve.runners(cls.id, _short(target), self.code))
         keys.update(self.code.constructs[r].name.rsplit(".", 1)[-1] for r in runners if r in self.code.constructs)
         return keys, runners
 
@@ -359,7 +356,8 @@ def _code(
     by_id, positions = resolve.index(files.values())
     for c in gone:
         by_id.setdefault(c.id, c)
-    live = [c for c in by_id.values() if c.id in positions.values()]
+    present = set(positions.values())
+    live = [c for c in by_id.values() if c.id in present]
     bases = {c.id: _class_bases(root, c, positions, resolver, failures) for c in live if c.kind == "class" and c.bases}
     implements = {}
     for box in boxes:

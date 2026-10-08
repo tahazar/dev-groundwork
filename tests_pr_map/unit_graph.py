@@ -111,6 +111,14 @@ class CandidateTests(GraphCase):
             (arrow["source"], arrow["certainty"], arrow["reason"]), ("lib.py::Foo.make", "possible", "through `cls`")
         )
 
+    def test_subclass_callers_survive_a_class_python_cannot_order_elsewhere(self):
+        lib = "class Foo:\n    def __init__(self, n):\n        self.n = n\n\n\nclass Baz(Foo):\n    pass\n"
+        use = "from lib import Baz\n\n\ndef caller():\n    return Baz(3)\n"
+        weird = "".join(f"class {c}:\n    pass\n\n\n" for c in ("A", "B", "X(A, B)", "Y(B, A)", "Z(X, Y)"))
+        m = self.build({"lib.py": lib, "use.py": use, "weird.py": weird}, {"lib.py": lib.replace("= n", "= int(n)")})
+        [arrow] = m.arrows("use.py::caller", "lib.py::Foo.__init__")
+        self.assertEqual(arrow["certainty"], "exact")
+
 
 class ImportLineTests(GraphCase):
     def test_import_lines_draw_no_arrows_and_add_no_boxes(self):
