@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from groundwork_config import DEFAULTS, load_config, matches_any, project_root
+from groundwork_config import DEFAULTS, diff_against, load_config, matches_any, merge_base, project_root
 
 ALLOW = re.compile(r"groundwork-allow:\s*(\S.*)")
 
@@ -53,10 +53,6 @@ COVERAGE_CONFIGS = ["**/vitest.config.*", "**/jest.config.*", "**/.nycrc*", "**/
 METRIC_FLOOR = r"\b(?:lines|branches|functions|statements)\b\s*:\s*\d"
 # Prose describes these patterns without using them.
 DOC_FILES = ["**/*.md", "**/*.mdx", "**/*.rst", "**/*.txt"]
-
-
-def git(root: Path, *args: str) -> str:
-    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout
 
 
 def scan_diff(diff: str, ignore: list[str], extra: dict[str, str]) -> list[tuple[str, str, str, str | None]]:
@@ -110,7 +106,7 @@ def allow_replaced_thresholds(
 
 
 def deleted_tests(root: Path, base: str, test_globs: list[str]) -> list[str]:
-    out = git(root, "diff", "--name-status", "--no-renames", base)
+    out = diff_against(root, base, "--name-status", "--no-renames")
     return [
         name
         for status, name in (line.split("\t", 1) for line in out.splitlines() if "\t" in line)
@@ -130,8 +126,8 @@ def main(argv: list[str] | None = None) -> int:
     extra = {f"extra-{i}": p for i, p in enumerate(workarounds.get("extraPatterns", []))}
 
     try:
-        base = git(root, "merge-base", args.base, "HEAD").strip()
-        diff = git(root, "diff", "--unified=0", "--no-color", base)
+        base = merge_base(root, args.base)
+        diff = diff_against(root, base, "--unified=0", "--no-color")
     except subprocess.CalledProcessError as exc:
         print(f"git failed: {exc.stderr.strip()}", file=sys.stderr)
         return 2

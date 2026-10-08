@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from groundwork_config import load_config, matches_any, project_root, walk_files
+from groundwork_config import diff_against, load_config, matches_any, merge_base, project_root, walk_files
 
 AC_LINE = re.compile(r"^\s*[-*]\s+\*\*(AC-\d+)\*\*(.*)$")
 
@@ -96,12 +95,7 @@ def check_feature(root: Path, config: dict, feature: str) -> int:
 def approved_features_changed_since(root: Path, config: dict, base: str) -> list[str]:
     """Features with changes since `base` whose requirements are approved."""
     spec_dir = config["specDir"].rstrip("/")
-    merge_base = subprocess.run(
-        ["git", "merge-base", base, "HEAD"], cwd=root, capture_output=True, text=True, check=True
-    ).stdout.strip()
-    names = subprocess.run(
-        ["git", "diff", "--name-only", merge_base, "--", spec_dir], cwd=root, capture_output=True, text=True, check=True
-    ).stdout.splitlines()
+    names = diff_against(root, merge_base(root, base), "--name-only", "--", spec_dir).splitlines()
     features = sorted({n[len(spec_dir) + 1 :].split("/", 1)[0] for n in names if n.startswith(spec_dir + "/")})
     approved = []
     for feature in features:
