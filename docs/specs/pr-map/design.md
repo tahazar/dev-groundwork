@@ -270,6 +270,12 @@ class Arrow:
      - jedi `get_references` (C16, C17b). It finds a renamed import but
        not the calls through it (C46), so pr-map follows aliases itself
        (next point).
+   - **Import lines are not reference sites.** An import statement draws
+     no arrow: the uses in code do. A function imported but never used
+     is left to the project's linter (ruff's F401, oxlint), which already
+     reports unused imports. Decided by the owner, 2026-10-08. Imports
+     still matter for two things: following aliases (next point) and
+     recognising library calls.
    - **Aliases.** When a reference site from either source is the name in
      an import that renames it (`as save`, `{ readClip as rc }`), the new
      name's identifiers in that file become candidates too.
