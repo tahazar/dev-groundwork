@@ -46,7 +46,17 @@ Show the user the file and confirm the commands before writing it.
 mkdir -p .groundwork/bin
 cp ${CLAUDE_PLUGIN_ROOT}/scripts/groundwork_config.py ${CLAUDE_PLUGIN_ROOT}/scripts/check_citations.py \
    ${CLAUDE_PLUGIN_ROOT}/scripts/check_ac_coverage.py ${CLAUDE_PLUGIN_ROOT}/scripts/detect_workarounds.py .groundwork/bin/
+mkdir -p .groundwork/bin/pr_map
+cp -R ${CLAUDE_PLUGIN_ROOT}/scripts/pr_map/*.py ${CLAUDE_PLUGIN_ROOT}/scripts/pr_map/resolve_ts.cjs \
+   ${CLAUDE_PLUGIN_ROOT}/scripts/pr_map/queries ${CLAUDE_PLUGIN_ROOT}/scripts/pr_map/requirements.txt \
+   ${CLAUDE_PLUGIN_ROOT}/scripts/pr_map/package.json ${CLAUDE_PLUGIN_ROOT}/scripts/pr_map/package-lock.json \
+   .groundwork/bin/pr_map/
 ```
+
+- `.groundwork/bin/pr_map/` is the pull request map. It needs the packages
+  in its `requirements.txt` and `package.json`, which its own workflow
+  installs; the other scripts do not import it. Do not copy its
+  `node_modules/`.
 
 - Add `.groundwork/state/` to `.gitignore`.
 - Copy `${CLAUDE_PLUGIN_ROOT}/templates/project-rules.md` to
