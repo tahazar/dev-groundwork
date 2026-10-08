@@ -13,7 +13,7 @@ make them pass.
   `package.json` and `package-lock.json`, the `tests_pr_map/` directory
   with the fixture builders, and a CI job in this repository that installs
   them and runs the tests. (AC-9, groundwork for the rest)
-- [ ] 3. `constructs.py` and the two query files: constructs with
+- [x] 3. `constructs.py` and the two query files: constructs with
   qualified names and innermost nesting, identifier sites, byte-to-character
   columns, syntax-error lines. (AC-1 to AC-3 groundwork, AC-8, AC-9, AC-19)
 - [ ] 4. Classification against the diff: changed, added, removed, with
