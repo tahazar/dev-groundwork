@@ -33,7 +33,7 @@ make them pass.
   author, the 403 and fork path, the 422 shrinking sequence, job summary,
   top-level failure handling, exit codes. Tested against a local HTTP
   server. (AC-14, AC-16, AC-18, AC-20, AC-21)
-- [ ] 10. `templates/ci/pr-map.yml` with the concurrency group, pinned
+- [x] 10. `templates/ci/pr-map.yml` with the concurrency group, pinned
   actions (look up the upload-artifact pin from its release tag) and
   install steps that record failures instead of failing. actionlint
   clean. (AC-15, AC-21)
