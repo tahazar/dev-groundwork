@@ -1,8 +1,8 @@
 # Spike results, 2026-10-08, Claude Code 2.1.294, in a claude.ai cloud container
 # (auth from the host, no ANTHROPIC_API_KEY). Produced by summarize.py from the
 # stream-json files of headless_spike.sh (spike1), isolation_spike.sh (spike2),
-# question_spike.sh (spike3) and limits_spike.sh (spike4). Raw files not kept:
-# they hold account and container details.
+# question_spike.sh (spike3), limits_spike.sh (spike4) and hooks_spike.sh (spike5).
+# Raw files not kept: they hold account and container details.
 
 == spike1/with-plugin.jsonl
 init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=dontAsk apiKeySource=none
@@ -153,3 +153,24 @@ same-name skills without plugin: ['debug', 'design']
 
 == skills left in the without-plugin arm under --setting-sources "" (spike2)
 nosources-without skills: ['artifact-capabilities', 'artifact-diagramming', 'batch', 'claude-api', 'code-review', 'dataviz', 'debug', 'deep-research', 'design', 'design-sync', 'doctor', 'fewer-permission-prompts', 'loop', 'plugin-authoring', 'run', 'run-skill-generator', 'simplify', 'slides', 'update-config', 'verify', 'workflow-authoring']
+
+== hooks_spike.sh (spike5)
+== spike5/guard.jsonl
+init: model=claude-haiku-5-5 claude_code_version=2.1.294 permissionMode=dontAsk apiKeySource=none
+init: plugins=['dev-groundwork@inline', 'cc-plugin-agents-md@builtin', 'cc-plugin-telemetry@builtin', 'cc-plugin-plugin-authoring@builtin']
+init: skills=30 dev-groundwork skills=['dev-groundwork:acceptance-tests', 'dev-groundwork:debug', 'dev-groundwork:design', 'dev-groundwork:implement', 'dev-groundwork:requirements', 'dev-groundwork:research', 'dev-groundwork:review', 'dev-groundwork:setup', 'dev-groundwork:test-first']
+init: tools=39 AskUserQuestion in tools=False
+init: mcp_servers=[]
+assistant tool_use: name=Bash input={"command": "rm tests/test_a.py", "description": "Delete tests/test_a.py"}
+user tool_result: is_error=True content='PreToolUse:Bash hook error: Tests are locked; this command could change tests/test_a.py. Ask the user to unlock tests first.'
+assistant text: 'The command didn\'t run: a PreToolUse hook blocked it with "Tests are locked; this command could change tests/test_a.py. Ask the user to unlock tests first," so `tests/test_a.py` was not deleted.'
+result: subtype=success is_error=False num_turns=2 total_cost_usd=0.00202658 duration_ms=4502 terminal_reason=completed permission_denials=[{"tool_name": "Bash", "tool_use_id": "toolu_01Bcz71tQfw6W2nMVMPc6rPV", "tool_input": {"command": "rm tests/test_a.py", "description": "Delete tests/test_a.py"}}]
+result: modelUsage models=['claude-haiku-5-5']
+result: result='The command didn\'t run: a PreToolUse hook blocked it with "Tests are locked; this command could change tests/test_a.py. Ask the user to unlock tests first," so `tests/test_a.py` was not deleted.'
+hook_response: PreToolUse:Bash exit_code 0 output {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Tests are locked; this command could change te
+hook_response: PreToolUse:Bash exit_code 0 output 
+guard exit 0
+tests/test_a.py still exists
+
+== session ids (spike1)
+child session_id equals the calling session CLAUDE_CODE_SESSION_ID: True
