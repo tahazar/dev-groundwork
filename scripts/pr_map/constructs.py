@@ -41,7 +41,9 @@ KINDS = {"function": "function", "method": "method", "class": "class", "interfac
 SIGNATURES = {"function_signature", "method_signature", "abstract_method_signature"}
 
 # Wrappers whose span belongs to the definition they wrap, so a changed decorator
-# or `export` keyword changes the construct.
+# or `export` keyword changes the construct. A TypeScript class member's decorators
+# are not a wrapper but the member's preceding siblings; _start and _decorated
+# handle those.
 WRAPPERS = {"decorated_definition", "export_statement"}
 
 
@@ -165,6 +167,9 @@ def parse(path: str, source: bytes) -> FileConstructs:
             if index is None and current.type in WRAPPERS:
                 inner = current.child_by_field_name("definition") or current.child_by_field_name("declaration")
                 index = node_group.get(inner.id) if inner is not None else None
+            if index is None and current.type == "decorator":
+                inner = _next_declaration(current)
+                index = node_group.get(inner.id) if inner is not None else None
             if index is not None and index != own:
                 return index
             current = current.parent
@@ -202,7 +207,7 @@ def parse(path: str, source: bytes) -> FileConstructs:
                 line=names[0][0],
                 column=names[0][1],
                 names=names,
-                start_line=_span(group[0][0]).start_point[0] + 1,
+                start_line=_start(group[0][0]).start_point[0] + 1,
                 end_line=group[-1][0].end_point[0] + 1,
                 parent=ids[parents[index]] if parents[index] is not None else None,
             )
@@ -256,10 +261,21 @@ def _span(node: Node) -> Node:
     return node
 
 
+def _start(node: Node) -> Node:
+    """The first node of a definition's span: its first decorator, its wrapper, or itself."""
+    start = _span(node)
+    previous = start.prev_named_sibling
+    while previous is not None and previous.type in ("decorator", "comment"):
+        if previous.type == "decorator":
+            start = previous
+        previous = previous.prev_named_sibling
+    return start
+
+
 def _next_declaration(node: Node) -> Node | None:
-    """The next named sibling that is not a comment."""
+    """The next named sibling that is not a comment or a decorator: for a decorator, what it decorates."""
     following = node.next_named_sibling
-    while following is not None and following.type == "comment":
+    while following is not None and following.type in ("comment", "decorator"):
         following = following.next_named_sibling
     return following
 

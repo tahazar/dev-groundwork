@@ -128,6 +128,14 @@ class NestingTests(unittest.TestCase):
         ts = by_id(parse("a.ts", "@dec\nexport class K {\n  run() {}\n}\n"))
         self.assertEqual((ts["a.ts::K"].start_line, ts["a.ts::K"].end_line), (1, 4))
 
+    def test_typescript_member_decorators_belong_to_the_member(self):
+        parsed = parse("a.ts", "class A {\n  @log(helper)\n  // note\n  @x m(): void {}\n  n(): void {}\n}\n")
+        m = by_id(parsed)["a.ts::A.m"]
+        self.assertEqual((m.start_line, m.end_line, m.line), (2, 4, 4))
+        self.assertEqual(by_id(parsed)["a.ts::A.n"].start_line, 5)
+        owners = [(s.name, s.owner) for s in parsed.sites]
+        self.assertEqual(owners, [("log", "a.ts::A.m"), ("helper", "a.ts::A.m"), ("x", "a.ts::A.m")])
+
 
 class SiteTests(unittest.TestCase):
     def test_definition_names_are_not_sites(self):
@@ -186,6 +194,14 @@ class OverloadTests(unittest.TestCase):
         self.assertEqual(
             [(c.name, c.kind, len(c.names)) for c in parsed.constructs],
             [("C", "class", 1), ("C.f", "method", 2), ("C.g", "method", 1)],
+        )
+
+    def test_overloads_with_a_decorated_implementation_are_one_method(self):
+        text = "class A {\n  m(a: string): void;\n  m(a: number): void;\n  @dec\n  m(a: any): void {}\n}\n"
+        parsed = parse("a.ts", text)
+        self.assertEqual(
+            [(c.id, c.kind, c.names) for c in parsed.constructs][1:],
+            [("a.ts::A.m", "method", ((2, 2), (3, 2), (5, 2)))],
         )
 
     def test_same_name_functions_that_are_not_overloads_stay_apart(self):
