@@ -29,7 +29,7 @@ make them pass.
   output. (AC-3, AC-4, AC-6, AC-7, AC-11)
 - [x] 8. `render.py`: Mermaid diagrams, splitting under the budgets, the
   text list, header and notes. (AC-8, AC-10 to AC-13, AC-17, AC-19)
-- [ ] 9. `github.py` and the entry point: comment upsert by marker and
+- [x] 9. `github.py` and the entry point: comment upsert by marker and
   author, the 403 and fork path, the 422 shrinking sequence, job summary,
   top-level failure handling, exit codes. Tested against a local HTTP
   server. (AC-14, AC-16, AC-18, AC-20, AC-21)
