@@ -134,9 +134,9 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual((loc.path, loc.line, loc.local), ("lib.py", 3, False))
 
     def test_unsupported_file_and_bad_position_raise_resolver_error(self):
-        repo = Repo(self, {"lib.py": "x = 1\n", "a.ts": "export const x = 1;\n"})
-        with self.assertRaisesRegex(resolve.ResolverError, r"a\.ts:1:0: no resolver for \.ts"):
-            repo.resolver.definition_at("a.ts", 1, 0)
+        repo = Repo(self, {"lib.py": "x = 1\n", "a.js": "export const x = 1;\n"})
+        with self.assertRaisesRegex(resolve.ResolverError, r"a\.js:1:0: no resolver for \.js"):
+            repo.resolver.definition_at("a.js", 1, 0)
         with self.assertRaisesRegex(resolve.ResolverError, r"jedi goto at lib\.py:1:40") as caught:
             repo.resolver.definition_at("lib.py", 1, 40)
         self.assertIsInstance(caught.exception.__cause__, ValueError)
@@ -521,10 +521,10 @@ class TraceTests(unittest.TestCase):
         source = "import numpy as np\n\n\ndef f(xs):\n    a = np.array(xs)\n    b = a\n    return b.mean()\n"
         self.assertEqual(self.trace(source, "b.mean", "mean"), "")
 
-    def test_typescript_is_not_traced_yet(self):
-        repo = Repo(self, {"a.ts": "export const x = 1;\n"})
-        with self.assertRaisesRegex(resolve.ResolverError, "only Python"):
-            repo.resolver.trace_import("a.ts", 1, 13)
+    def test_other_languages_are_not_traced(self):
+        repo = Repo(self, {"a.js": "export const x = 1;\n"})
+        with self.assertRaisesRegex(resolve.ResolverError, r"tracing imports in a\.js: no resolver for \.js"):
+            repo.resolver.trace_import("a.js", 1, 13)
 
 
 class MroTests(unittest.TestCase):
