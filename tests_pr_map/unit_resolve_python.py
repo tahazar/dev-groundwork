@@ -268,6 +268,63 @@ class CallerVerdictTests(unittest.TestCase):
         v = resolve.verdict(candidate, Answer(), repo.code)
         self.assertEqual(v, Verdict("possible", "lib.py::Foo.__init__", "through `cls`"))
 
+    def test_target_among_several_boxes_is_possible(self):
+        lib = (
+            "class A:\n    def save(self):\n        return 1\n\n\n"
+            "class B:\n    def save(self):\n        return 2\n\n\n"
+            "def store(obj: A | B):\n    return obj.save()\n"
+        )
+        repo = Repo(self, {"lib.py": lib})
+        s = repo.site("lib.py", "obj.save()", "save")
+        self.assertEqual(len(repo.resolver.definition_at("lib.py", s.line, s.column)), 2, "jedi answers both")
+        v = repo.judge("lib.py", "obj.save()", CALLER, "lib.py::A.save", "save")
+        self.assertEqual(v, Verdict("possible", "lib.py::A.save", "unresolved"))
+
+    def test_module_reached_through_sys_path_is_not_a_library(self):
+        lib = "def target():\n    return 1\n"
+        use = (
+            "import sys\n\nsys.path.insert(0, 'scripts/tool')\nimport lib\n\n\ndef caller():\n    return lib.target()\n"
+        )
+        repo = Repo(self, {"scripts/tool/lib.py": lib, "tests/t.py": use})
+        s = repo.site("tests/t.py", "lib.target()", "target")
+        self.assertEqual(repo.resolver.trace_import("tests/t.py", s.line, s.column), "repository")
+
+    def test_comprehension_variable_is_not_traced_to_an_outer_binding(self):
+        use = "import numpy as np\n\nx = np.zeros(3)\n\n\ndef f(items):\n    return [x.save() for x in items]\n"
+        repo = Repo(self, {"use.py": use})
+        s = repo.site("use.py", "x.save()", "save")
+        self.assertEqual(repo.resolver.trace_import("use.py", s.line, s.column), "")
+
+    def test_splat_parameters_are_bindings(self):
+        use = (
+            "import numpy as np\n\nargs = np.zeros(3)\n\n\n"
+            "def f(*args: np.ndarray, **kw):\n    return args.save(), kw.save()\n"
+        )
+        repo = Repo(self, {"use.py": use})
+        for needle in ("args.save()", "kw.save()"):
+            s = repo.site("use.py", needle, "save")
+            self.assertEqual(repo.resolver.trace_import("use.py", s.line, s.column), "", needle)
+
+    def test_callee_refers_and_resolver_failure(self):
+        lib = (
+            "def notes():\n    return []\n\n\n"
+            "class Clip:\n    def __init__(self):\n        self.notes = [1]\n\n"
+            "    def count(self):\n        return len(self.notes)\n"
+        )
+        repo = Repo(self, {"lib.py": lib})
+        v = repo.judge("lib.py", "self.notes)", CALLEE, name="notes")
+        self.assertEqual(v, Verdict("", note="refers", refers_to="lib.py:7"))
+        candidate = Candidate("lib.py", 10, 0, "notes", True, CALLEE)
+        v = resolve.verdict(candidate, Answer(error="boom"), repo.code, ["lib.py::notes"])
+        self.assertEqual(v, Verdict("possible", "lib.py::notes", "resolver failed: boom"))
+
+    def test_removed_target_library_and_local_answers_draw_nothing(self):
+        repo = Repo(self, {"lib.py": "def stay():\n    return 2\n"})
+        candidate = Candidate("lib.py", 1, 0, "gone", True, REMOVED, "lib.py::gone")
+        self.assertEqual(resolve.verdict(candidate, Answer(traced="library"), repo.code), Verdict("", note="library"))
+        local = Answer((Location("lib.py", 1, 0, "param", "x", local=True),))
+        self.assertEqual(resolve.verdict(candidate, local, repo.code), Verdict(""))
+
 
 CONSTRUCTORS = (
     "class Foo:\n"
@@ -334,6 +391,15 @@ class ConstructorTests(unittest.TestCase):
         repo = Repo(self, {"lib.py": lib, "use.py": "from lib import Dec\n\nDec()\n"})
         v = repo.judge("use.py", "Dec()", CALLER, "lib.py::Foo.__init__", "Dec")
         self.assertEqual(v, Verdict("possible", "lib.py::Foo.__init__", "through `json.decoder.JSONDecoder`"))
+
+    def test_decorated_subclass_may_generate_its_own_init(self):
+        lib = (
+            "from dataclasses import dataclass\n\n\nclass Foo:\n    def __init__(self, n):\n        self.n = n\n\n\n"
+            "@dataclass\nclass Baz(Foo):\n    x: int\n"
+        )
+        repo = Repo(self, {"lib.py": lib, "use.py": "from lib import Baz\n\nBaz(3)\n"})
+        v = repo.judge("use.py", "Baz(3)", CALLER, "lib.py::Foo.__init__", "Baz")
+        self.assertEqual(v, Verdict("possible", "lib.py::Foo.__init__", "through `lib.py::Baz`"))
 
     def test_call_of_a_class_whose_init_was_removed_is_listed(self):
         repo = Repo(

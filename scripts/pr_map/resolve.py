@@ -21,7 +21,7 @@ from pathlib import Path
 import constructs
 import jedi
 from constructs import Construct, FileConstructs
-from groundwork_config import SKIP_DIRS
+from groundwork_config import SKIP_DIRS, walk_files
 from tree_sitter import Node
 
 # jedi infers an untyped parameter's type from the calls it sees (C58, C59). It
@@ -35,6 +35,11 @@ PROJECT_MARKERS = ("pyproject.toml", "setup.cfg", "setup.py")
 CONSTRUCTORS = {"__init__", "__new__"}
 
 CALLER, CALLEE, REMOVED = "caller", "callee", "removed"
+
+# Python node types that open a scope for name lookup. A class body is not one
+# for the code inside its methods, so it is left out.
+COMPREHENSIONS = ("list_comprehension", "set_comprehension", "dictionary_comprehension", "generator_expression")
+SCOPES = ("function_definition", "lambda", "module", *COMPREHENSIONS)
 
 
 class ResolverError(RuntimeError):
@@ -123,7 +128,7 @@ class Resolver:
         self.root = root.resolve()
         self._projects: dict[Path, jedi.Project] = {}
         self._scripts: dict[str, jedi.Script] = {}
-        self._roots: tuple[Path, ...] | None = None
+        self._modules: frozenset[str] | None = None
 
     def definition_at(self, path: str, line: int, column: int) -> list[Location]:
         """Where the identifier at path:line:column (1-based line, character column) is defined."""
@@ -177,7 +182,8 @@ class Resolver:
 
         The leftmost name of an attribute chain (`np` in `np.mean`) is looked
         up in its scope. An import of a module not found in the repository is
-        "library"; one that is found, or a relative import, is "repository".
+        "library"; one that is found, or a relative import, is "repository"
+        (see _in_repository).
         A variable assigned once in that scope is traced through its value's
         leftmost name, and a parameter through its type annotation, one step
         only. Anything else, such as an untyped parameter or a variable
@@ -193,29 +199,23 @@ class Resolver:
         module = _trace(node, follow=True) if node is not None else None
         if module is None:
             return ""
-        if module.startswith(".") or self._in_repository(module.split(".")[0], path):
+        if module.startswith(".") or self._in_repository(module.split(".")[0]):
             return "repository"
         return "library"
 
-    def _in_repository(self, top: str, path: str) -> bool:
-        """A top-level module is in the repository when it is found beside the importing file, in a
-        directory above it, or under a project root (or its `src`)."""
-        places = [Path(path).parent, *Path(path).parent.parents]
-        places += [p.relative_to(self.root) for p in self._project_roots()]
-        places += [p / "src" for p in places]
-        return any((self.root / p / f"{top}.py").is_file() or (self.root / p / top).is_dir() for p in places)
-
-    def _project_roots(self) -> tuple[Path, ...]:
-        """Directories with a project file, outside the skip list."""
-        if self._roots is None:
-            found = {
-                m.parent
-                for name in PROJECT_MARKERS
-                for m in self.root.rglob(name)
-                if not SKIP_DIRS.intersection(m.relative_to(self.root).parts[:-1])
-            }
-            self._roots = tuple(sorted(found))
-        return self._roots
+    def _in_repository(self, top: str) -> bool:
+        """A top-level module is in the repository when a `<top>.py` file or a `<top>` directory holding
+        Python files exists anywhere in it, outside the skip list. Code can reach any of them through
+        `sys.path`, so this is wider than the project roots on purpose: a repository module read as a
+        library would drop its callers."""
+        if self._modules is None:
+            modules: set[str] = set()
+            for file in walk_files(self.root):
+                if file.suffix == ".py":
+                    modules.add(file.stem)
+                    modules.update(file.relative_to(self.root).parts[:-1])
+            self._modules = frozenset(modules)
+        return top in self._modules
 
     def _project(self, path: str) -> jedi.Project:
         """One jedi Project per nearest directory with a project file, else the repository root."""
@@ -296,7 +296,8 @@ def mro(cls: str, bases: Mapping[str, tuple[str, ...]]) -> list[str]:
 
 def runners(cls: str, method: str, code: Code) -> dict[str, str]:
     """Classes whose instances run cls.method when constructed: each maps to "" when certain, or to the
-    first outside base that comes before cls in its order and might define the method itself.
+    first class before cls in its order that might define the method itself: one outside the repository,
+    or a decorated one (`@dataclass` generates `__init__`).
 
     A class is a runner when its order reaches cls before any other repository
     class that defines method (design, step 5: a mixin listed first, or a
@@ -319,6 +320,9 @@ def _runs(other: str, cls: str, method: str, code: Code) -> str | None:
             return None
         if name not in code.bases and name != "builtins.object" and not outside:
             outside = name
+        decorated = name in code.constructs and code.constructs[name].start_line < code.constructs[name].line
+        if decorated and not outside:
+            outside = name  # a class decorator such as @dataclass may generate the method
     return outside
 
 
@@ -384,11 +388,11 @@ def verdict(candidate: Candidate, answer: Answer, code: Code, named: Sequence[st
         elif not refers:
             refers, refers_to = True, f"{loc.path}:{loc.line}"
 
-    if candidate.role == CALLER and candidate.target in boxes:
+    if candidate.role == CALLER and boxes == [candidate.target]:
         if uncertain:
             return Verdict("possible", candidate.target, f"through `{uncertain}`")
         return Verdict("exact", candidate.target)
-    if candidate.role == CALLER:
+    if candidate.role == CALLER and candidate.target not in boxes:
         through = sorted(related(candidate.target, code).intersection(boxes)) if candidate.target else []
         if through:
             return Verdict("possible", candidate.target, f"through `{through[0]}`")
@@ -459,7 +463,7 @@ def _trace(node: Node, follow: bool) -> str | None:
     if name is None:
         return None
     scope = name.parent
-    while scope is not None and scope.type not in ("function_definition", "lambda", "module"):
+    while scope is not None and scope.type not in SCOPES:
         scope = scope.parent
     while scope is not None:
         bindings = _bindings(scope, name.text.decode("utf-8"))
@@ -473,7 +477,7 @@ def _trace(node: Node, follow: bool) -> str | None:
                 return _trace(value, follow=False)
             return None
         scope = scope.parent
-        while scope is not None and scope.type not in ("function_definition", "lambda", "module"):
+        while scope is not None and scope.type not in SCOPES:
             scope = scope.parent
     return None
 
@@ -495,15 +499,28 @@ def _bindings(scope: Node, name: str) -> list[tuple[str, object]]:
     """How name is bound directly in scope: ("import", module), ("assign", value node),
     ("annotation", type node) for a typed parameter, or ("other", None)."""
     found: list[tuple[str, object]] = []
+    if scope.type in COMPREHENSIONS:
+        for clause in scope.named_children:
+            target = clause.child_by_field_name("left") if clause.type == "for_in_clause" else None
+            if target is not None and any(
+                n.type == "identifier" and n.text.decode("utf-8") == name for n in _descendants(target)
+            ):
+                found.append(("other", None))
+        return found
     if scope.type in ("function_definition", "lambda"):
         parameters = scope.child_by_field_name("parameters")
         for p in parameters.named_children if parameters is not None else ():
+            if p.type in ("list_splat_pattern", "dictionary_splat_pattern") and p.named_children:
+                p = p.named_children[0]  # `*args`, `**kw`
             if p.type == "identifier" and p.text.decode("utf-8") == name:
                 found.append(("other", None))
             elif p.type in ("typed_parameter", "typed_default_parameter"):
                 inner = p.child_by_field_name("name") or p.named_children[0]
+                splat = inner.type in ("list_splat_pattern", "dictionary_splat_pattern")
+                if splat and inner.named_children:
+                    inner = inner.named_children[0]  # `*args: T` holds a tuple of T, not a T
                 if inner.type == "identifier" and inner.text.decode("utf-8") == name:
-                    found.append(("annotation", p.child_by_field_name("type")))
+                    found.append(("other", None) if splat else ("annotation", p.child_by_field_name("type")))
             elif p.type == "default_parameter" and p.child_by_field_name("name").text.decode("utf-8") == name:
                 found.append(("other", None))
         body = scope.child_by_field_name("body")
