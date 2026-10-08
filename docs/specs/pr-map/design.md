@@ -780,34 +780,56 @@ desktop browser, a phone browser and the app used for the trial.
   read it, so its functions are neither boxes nor neighbours.
 - The count of changed source files left out this way goes in the notes
   as `left_out: {".groundwork/": n}`.
-- The prefix is a constant in `pr_map.py`. `SKIP_DIRS` in
+- The prefix is a constant in `pr_map.py`, applied in `_source()` (changed
+  files) and to the result of `constructs.scan` in `build_map` (the
+  whole-repository scan), which cannot import `pr_map.py`. `SKIP_DIRS` in
   `groundwork_config.py` is not changed, because the other checks that use
   it are outside this revision.
+- The resolvers still see `.groundwork/`. A resolver answer that lands
+  there is a definition that is not a box, so it is listed in the text
+  section as "refers to", like any other (step 6). Project code rarely
+  imports those scripts.
 
 **The map gains `files`**: `{path: "changed" | "added" | "removed"}` for
-each changed source file, from the `--name-status` letters (a rename is
-"changed" under its new path, and its old path is not listed). A file in
-the map with no entry is "unchanged".
+each changed source file, from the `FileChange(old, new)` pairs after
+`_source()` has filtered them, not from the raw status letters:
+- `old` absent: the new path is "added";
+- `new` absent: the old path is "removed";
+- both present and equal: "changed";
+- a rename: the new path is "changed" and the old path "removed", because
+  the constructs that only the base had are removed boxes under the old
+  path (`classify()` parses the base at `change.old`). A rename to a file
+  pr-map does not read (`a.py` to `a.txt`) has no new side, so `a.py` is
+  "removed".
+
+A file in the map with no entry is "unchanged"; it holds only neighbours,
+as AC-23 says.
 
 **Step 8, render** (AC-8, AC-10 to AC-13, AC-17, AC-19, AC-23 to AC-29).
 The comment, in order:
 
 1. **Header**, counts and legend, as today.
 2. **File map** (AC-23, AC-24). One Mermaid diagram.
-   - One box per path that holds a box. Label: `<status>: <path>`.
+   - One box per path that holds a box. Its label has two lines:
+     `<status>: <file name>`, then the directory (see Direction). Together
+     they are the path.
    - One arrow per ordered pair of different files with at least one arrow
-     between their boxes. Its label is the count. It is solid (`-->`) when
-     any of those arrows is exact, and dashed with `possible, <count>`
-     otherwise.
+     between their boxes. Its label is the number of function-map arrows
+     behind it; each of those is one reference site, so two calls from one
+     function count twice, as the text list shows them. It is solid
+     (`-->`) when any of those arrows is exact, and dashed with
+     `possible, <count>` otherwise.
    - Arrows within one file are not drawn here.
 3. **File sections** (AC-25 to AC-27), one per path that holds a changed,
    added or removed box, in path order. Each is
    `<details><summary>` with the path and
    `<n> changed, <n> added, <n> removed; <n> callers, <n> callees`.
    - *Anchors* are the file's changed, added and removed boxes. The
-     section draws every arrow that touches an anchor, and the boxes at
-     both ends. Callers and callees are the distinct boxes at the other end
-     of those arrows, counted once each even when they are anchors too.
+     section's boxes are the anchors and every box at the other end of an
+     arrow that touches an anchor. It draws every arrow whose two ends are
+     both among those boxes (AC-26: "the arrows between them"), so an arrow
+     between two neighbours appears too. Callers and callees are the
+     distinct boxes at the other end of arrows into and out of anchors.
    - **Collapse** (AC-27). When more than 25 of a section's boxes are in
      other files, those boxes are drawn as one box per other file:
      `<path>: <n> functions`. Their arrows are merged per file, anchor and
@@ -816,6 +838,21 @@ The comment, in order:
      grouped by file. Boxes in the section's own file are never collapsed.
    - Splitting (AC-12) reuses `split()` on each diagram, the file map
      included, with the same budgets.
+
+**How the file map and collapsed boxes reuse `mermaid()` and `split()`.**
+Both functions take box dicts and `Edge`s. Two small changes let them draw
+the new diagrams:
+- `mermaid()` gains a `direction` argument (`"LR"` by default, `"TB"` for
+  the file map), and draws a box's `label` field when it has one instead
+  of building the label from `name`, `path` and `line`. `_label()`, which
+  `split()` uses for part titles, does the same.
+- `Edge` gains a `count` field, 1 by default. A count above 1 is written
+  as the arrow's label (`-->|3|`, `-.->|possible, 3|`).
+
+A file box is then `{"id": "file:<path>", "label": ..., "status": ...}`,
+and a collapsed box `{"id": "group:<path>", "label": "<path>: <n>
+functions", "status": "neighbour"}`. Both live only while the comment is
+written; the map's data does not change (see the rejected R2).
 4. **Notes**, as today, plus the `.groundwork/` count (AC-30).
 5. **Text list**, as today (AC-13): every arrow, unchanged by the
    collapse, so a collapsed box can still be searched for by name.
@@ -875,7 +912,9 @@ header, counts and link. Each version says what moved.
 ### Tests (revision 2)
 
 The acceptance tests change with the criteria. That stage lists every
-changed assertion and why. Expected changes to `test_render.py`:
+changed assertion and why. The unit tests change with the code: the
+`escape` assertions in `unit_render.py` follow the new label rule.
+Expected changes to the acceptance tests in `test_render.py`:
 
 - Tests that count diagrams (`len(parts) == 1`) count the diagrams in one
   section instead, because the comment now holds a file map too.
@@ -887,8 +926,9 @@ changed assertion and why. Expected changes to `test_render.py`:
 New tests, one or more per new criterion: the file map's boxes, counts and
 arrow styles (AC-23, AC-24); section order, titles and contents (AC-25,
 AC-26); the collapse at 26 and not at 25 (AC-27); no `fill` or `color` in
-any diagram (AC-28); labels that keep `merge_base` and `__init__` raw, write `Map<string, T>` as `Map#lt;string, T#gt;`, and contain no decimal entity code (AC-29); and a fixture with a
-`.groundwork/` file changed and called (AC-30).
+any diagram (AC-28); labels that keep `merge_base` and `__init__` raw, write `Map<string, T>` as `Map#lt;string, T#gt;`, and contain no decimal entity code (AC-29); a fixture with a
+`.groundwork/` file changed and called (AC-30); and a rename that deletes a
+function, whose old path is a "removed" file (AC-23).
 
 ### Criteria coverage (revision 2)
 
