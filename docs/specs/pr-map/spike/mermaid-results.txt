@@ -1,0 +1,354 @@
+# pr-map Mermaid measurements, 2026-10-08. Chromium chromium-1194, Playwright 1.56.1, mermaid from npm: 11.4.1, 11.12.0, 11.13.0, 11.14.0, 11.17.2, 12.1.0.
+
+## 1. Label escaping matrix (harness/escape_matrix.mjs, raw rows in escape-results.json)
+combinations where theme or securityLevel changed the displayed text: 0
+foreignObject present by htmlLabels: {(True, True): 3768, (True, None): 72, (False, False): 3768, (False, None): 72}
+
+## Names displayed exactly, of 20 (theme/securityLevel had no effect)
+
+| strategy | 11.4.1 html=T | 11.4.1 html=F | 11.12.0 html=T | 11.12.0 html=F | 11.13.0 html=T | 11.13.0 html=F | 11.14.0 html=T | 11.14.0 html=F | 11.17.2 html=T | 11.17.2 html=F | 12.1.0 html=T | 12.1.0 html=F |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| a_entities | 20 | 2 | 20 | 2 | 20 | 2 | 20 | 2 | 20 | 2 | 20 | 2 |
+| b_raw | 12 | 10 | 14 | 11 | 18 | 17 | 18 | 18 | 18 | 18 | 18 | 18 |
+| c_backslash | 19 | 4 | 19 | 5 | 7 | 5 | 7 | 6 | 7 | 6 | 7 | 6 |
+| d_quote_only | 13 | 10 | 15 | 11 | 19 | 17 | 19 | 18 | 19 | 18 | 19 | 18 |
+| e_html_entities | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 |
+| f_markdown_string_raw | 12 | 10 | 13 | 11 | 13 | 11 | 13 | 12 | 13 | 12 | 13 | 12 |
+| g_quote_hash_lt_amp | 14 | 8 | 16 | 8 | 20 | 14 | 20 | 14 | 20 | 14 | 20 | 14 |
+| h_raw_named_lt_gt_quot | 14 | 10 | 16 | 11 | 20 | 17 | 20 | 19 | 20 | 19 | 20 | 19 |
+
+## Failures (displayed text, first line) per strategy
+
+### a_entities
+- 11.4.1 htmlLabels=False: __init__ -> '&#95;&#95;init&#95;&#95;⏎f.py:1'; merge_base -> 'merge&#95;base⏎f.py:1'; _private -> '&#95;private⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a&#42;b&#42;c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a&#96;b&#96;c⏎f.py:1'; [x] -> '&#91;x&#93;⏎f.py:1'; foo\bar -> 'foo&#92;bar⏎f.py:1'; ~x~ -> '&#126;x&#126;⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&#95;ma⏎p.py:12⏎f.py:1'; _x_ -> '&#95;x&#95;⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&#91;id&#93;/(group)/p⏎age.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&#95;&#95;eq&#95;&#9⏎5;⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> '&#95;&#95;init&#95;&#95;⏎f.py:1'; merge_base -> 'merge&#95;base⏎f.py:1'; _private -> '&#95;private⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a&#42;b&#42;c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a&#96;b&#96;c⏎f.py:1'; [x] -> '&#91;x&#93;⏎f.py:1'; foo\bar -> 'foo&#92;bar⏎f.py:1'; ~x~ -> '&#126;x&#126;⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&#95;ma⏎p.py:12⏎f.py:1'; _x_ -> '&#95;x&#95;⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&#91;id&#93;/(group)/p⏎age.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&#95;&#95;eq&#95;&#9⏎5;⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.13.0 htmlLabels=False: __init__ -> '&#95;&#95;init&#95;&#95;⏎f.py:1'; merge_base -> 'merge&#95;base⏎f.py:1'; _private -> '&#95;private⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a&#42;b&#42;c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a&#96;b&#96;c⏎f.py:1'; [x] -> '&#91;x&#93;⏎f.py:1'; foo\bar -> 'foo&#92;bar⏎f.py:1'; ~x~ -> '&#126;x&#126;⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&#95;ma⏎p.py:12⏎f.py:1'; _x_ -> '&#95;x&#95;⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&#91;id&#93;/(group)/p⏎age.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&#95;&#95;eq&#95;&#9⏎5;⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.14.0 htmlLabels=False: __init__ -> '&#95;&#95;init&#95;&#95;⏎f.py:1'; merge_base -> 'merge&#95;base⏎f.py:1'; _private -> '&#95;private⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a&#42;b&#42;c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a&#96;b&#96;c⏎f.py:1'; [x] -> '&#91;x&#93;⏎f.py:1'; foo\bar -> 'foo&#92;bar⏎f.py:1'; ~x~ -> '&#126;x&#126;⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&#95;ma⏎p.py:12⏎f.py:1'; _x_ -> '&#95;x&#95;⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&#91;id&#93;/(group)/p⏎age.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&#95;&#95;eq&#95;&#9⏎5;⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.17.2 htmlLabels=False: __init__ -> '&#95;&#95;init&#95;&#95;⏎f.py:1'; merge_base -> 'merge&#95;base⏎f.py:1'; _private -> '&#95;private⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a&#42;b&#42;c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a&#96;b&#96;c⏎f.py:1'; [x] -> '&#91;x&#93;⏎f.py:1'; foo\bar -> 'foo&#92;bar⏎f.py:1'; ~x~ -> '&#126;x&#126;⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&#95;ma⏎p.py:12⏎f.py:1'; _x_ -> '&#95;x&#95;⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&#91;id&#93;/(group)/p⏎age.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&#95;&#95;eq&#95;&#9⏎5;⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 12.1.0 htmlLabels=False: __init__ -> '&#95;&#95;init&⏎#95;&#95;⏎f.py:1'; merge_base -> 'merge&#95;bas⏎e⏎f.py:1'; _private -> '&#95;private⏎f.py:1'; Map<string, T> -> 'Map&#60;string,⏎T&#62;⏎f.py:1'; a*b*c -> 'a&#42;b&#42;c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a&#96;b&#96;c⏎f.py:1'; [x] -> '&#91;x&#93;⏎f.py:1'; foo\bar -> 'foo&#92;bar⏎f.py:1'; ~x~ -> '&#126;x&#126;⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/⏎pr&#95;map.py:⏎12⏎f.py:1'; _x_ -> '&#95;x&#95;⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&#91;id&#9⏎3;/(group)/page.t⏎sx⏎f.py:1'; obj.__eq__ -> 'obj.&#95;&#95;e⏎q&#95;&#95;⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+
+### b_raw
+- 11.4.1 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> 'aUnsupported markdown: codespanc⏎f.py:1'; ~x~ -> 'Unsupported markdown: del⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; a & b -> 'a &amp; b⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.13.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+- 11.13.0 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR; a < b -> 'a &lt; b⏎f.py:1'
+- 11.14.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+- 11.14.0 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+- 11.17.2 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+- 11.17.2 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+- 12.1.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+- 12.1.0 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> PARSE ERROR
+
+### c_backslash
+- 11.4.1 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> 'init⏎f.py:1'; merge_base -> 'merge base⏎f.py:1'; _private -> 'private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a b c⏎f.py:1'; [x] -> 'x⏎f.py:1'; foo\bar -> 'foo bar⏎f.py:1'; ~x~ -> 'x⏎f.py:1'; a & b -> 'a &amp; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr⏎map.py:12⏎f.py:1'; _x_ -> 'x⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/ id /(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; merge_base -> 'merge base⏎f.py:1'; _private -> 'private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a b c⏎f.py:1'; [x] -> 'x⏎f.py:1'; foo\bar -> 'foo bar⏎f.py:1'; ~x~ -> 'x⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr⏎map.py:12⏎f.py:1'; _x_ -> 'x⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/ id /(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.13.0 htmlLabels=True: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+- 11.13.0 htmlLabels=False: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py⏎:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.14.0 htmlLabels=True: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+- 11.14.0 htmlLabels=False: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py⏎:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+- 11.17.2 htmlLabels=True: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+- 11.17.2 htmlLabels=False: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py⏎:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+- 12.1.0 htmlLabels=True: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr\\_map.py:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+- 12.1.0 htmlLabels=False: __init__ -> '\\_\\_init\\_\\_⏎f.py:1'; merge_base -> 'merge\\_base⏎f.py:1'; _private -> '\\_private⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a\\*b\\*c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a\\`b\\`c⏎f.py:1'; [x] -> '\\[x\\]⏎f.py:1'; foo\bar -> 'foo\\\\bar⏎f.py:1'; ~x~ -> '\\~x\\~⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/⏎pr\\_map.py:12⏎f.py:1'; _x_ -> '\\_x\\_⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/\\[id\\]/(group)⏎/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.\\_\\_eq\\_\\_⏎f.py:1'
+
+### d_quote_only
+- 11.4.1 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; a`b`c -> 'aUnsupported markdown: codespanc⏎f.py:1'; ~x~ -> 'Unsupported markdown: del⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; a & b -> 'a &amp; b⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.13.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'
+- 11.13.0 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.14.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'
+- 11.14.0 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'
+- 11.17.2 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'
+- 11.17.2 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'
+- 12.1.0 htmlLabels=True: Map<string, T> -> 'Map⏎f.py:1'
+- 12.1.0 htmlLabels=False: Map<string, T> -> 'Map⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'
+
+### e_html_entities
+- 11.4.1 htmlLabels=True: __init__ -> '&_&_init&_&_⏎f.py:1'; merge_base -> 'merge&_base⏎f.py:1'; _private -> '&_private⏎f.py:1'; Map<string, T> -> 'Map&<string, T&>⏎f.py:1'; a*b*c -> 'a&*b&*c⏎f.py:1'; x"y -> 'x&"y⏎f.py:1'; #tag -> '&#tag⏎f.py:1'; a`b`c -> 'a&`b&`c⏎f.py:1'; [x] -> '&[x&]⏎f.py:1'; foo\bar -> 'foo&\\bar⏎f.py:1'; ~x~ -> '&~x&~⏎f.py:1'; a & b -> 'a && b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&_map.py:12⏎f.py:1'; _x_ -> '&_x&_⏎f.py:1'; #count -> '&#count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&[id&]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&_&_eq&_&_⏎f.py:1'; a < b -> 'a &< b⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> '&amp;&#95;&amp;&#95;init⏎&amp;&#95;&amp;&#95;⏎f.py:1'; merge_base -> 'merge&amp;&#95;base⏎f.py:1'; _private -> '&amp;&#95;private⏎f.py:1'; Map<string, T> -> 'Map&amp;&#60;string,⏎T&amp;&#62;⏎f.py:1'; a*b*c -> 'a&amp;&#42;b&amp;&#42;⏎c⏎f.py:1'; x"y -> 'x&amp;&#34;y⏎f.py:1'; #tag -> '&amp;&#35;tag⏎f.py:1'; a`b`c -> 'a&amp;&#96;b&amp;&#96;⏎c⏎f.py:1'; [x] -> '&amp;&#91;x&amp;&#93;⏎f.py:1'; foo\bar -> 'foo&amp;&#92;bar⏎f.py:1'; ~x~ -> '&amp;&#126;x&amp;&#126⏎;⏎f.py:1'; a & b -> 'a &amp;&#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&amp;&#⏎95;map.py:12⏎f.py:1'; _x_ -> '&amp;&#95;x&amp;&#95;⏎f.py:1'; #count -> '&amp;&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&amp;&#91;id&amp;&#⏎93;/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&amp;&#95;&amp;&#95⏎;eq&amp;&#95;&amp;&#95;⏎f.py:1'; a < b -> 'a &amp;&#60; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: __init__ -> '&_&_init&_&_⏎f.py:1'; merge_base -> 'merge&_base⏎f.py:1'; _private -> '&_private⏎f.py:1'; Map<string, T> -> 'Map&<string, T&>⏎f.py:1'; a*b*c -> 'a&*b&*c⏎f.py:1'; x"y -> 'x&"y⏎f.py:1'; #tag -> '&#tag⏎f.py:1'; a`b`c -> 'a&`b&`c⏎f.py:1'; [x] -> '&[x&]⏎f.py:1'; foo\bar -> 'foo&\\bar⏎f.py:1'; ~x~ -> '&~x&~⏎f.py:1'; a & b -> 'a && b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&_map.py:12⏎f.py:1'; _x_ -> '&_x&_⏎f.py:1'; #count -> '&#count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&[id&]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&_&_eq&_&_⏎f.py:1'; a < b -> 'a &< b⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> '&&#95;&&#95;init&&#95;&&⏎#95;⏎f.py:1'; merge_base -> 'merge&&#95;base⏎f.py:1'; _private -> '&&#95;private⏎f.py:1'; Map<string, T> -> 'Map&&#60;string, T&&#62;⏎f.py:1'; a*b*c -> 'a&&#42;b&&#42;c⏎f.py:1'; x"y -> 'x&&#34;y⏎f.py:1'; #tag -> '&&#35;tag⏎f.py:1'; a`b`c -> 'a&&#96;b&&#96;c⏎f.py:1'; [x] -> '&&#91;x&&#93;⏎f.py:1'; foo\bar -> 'foo&&#92;bar⏎f.py:1'; ~x~ -> '&&#126;x&&#126;⏎f.py:1'; a & b -> 'a &&#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&&#95;m⏎ap.py:12⏎f.py:1'; _x_ -> '&&#95;x&&#95;⏎f.py:1'; #count -> '&&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&&#91;id&&#93;/(group⏎)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&&#95;&&#95;eq&&#95⏎;&&#95;⏎f.py:1'; a < b -> 'a &&#60; b⏎f.py:1'
+- 11.13.0 htmlLabels=True: __init__ -> '&_&_init&_&_⏎f.py:1'; merge_base -> 'merge&_base⏎f.py:1'; _private -> '&_private⏎f.py:1'; Map<string, T> -> 'Map&<string, T&>⏎f.py:1'; a*b*c -> 'a&*b&*c⏎f.py:1'; x"y -> 'x&"y⏎f.py:1'; #tag -> '&#tag⏎f.py:1'; a`b`c -> 'a&`b&`c⏎f.py:1'; [x] -> '&[x&]⏎f.py:1'; foo\bar -> 'foo&\\bar⏎f.py:1'; ~x~ -> '&~x&~⏎f.py:1'; a & b -> 'a && b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&_map.py:12⏎f.py:1'; _x_ -> '&_x&_⏎f.py:1'; #count -> '&#count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&[id&]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&_&_eq&_&_⏎f.py:1'; a < b -> 'a &< b⏎f.py:1'
+- 11.13.0 htmlLabels=False: __init__ -> '&&#95;&&#95;init&&#95;&&⏎#95;⏎f.py:1'; merge_base -> 'merge&&#95;base⏎f.py:1'; _private -> '&&#95;private⏎f.py:1'; Map<string, T> -> 'Map&&#60;string, T&&#62;⏎f.py:1'; a*b*c -> 'a&&#42;b&&#42;c⏎f.py:1'; x"y -> 'x&&#34;y⏎f.py:1'; #tag -> '&&#35;tag⏎f.py:1'; a`b`c -> 'a&&#96;b&&#96;c⏎f.py:1'; [x] -> '&&#91;x&&#93;⏎f.py:1'; foo\bar -> 'foo&&#92;bar⏎f.py:1'; ~x~ -> '&&#126;x&&#126;⏎f.py:1'; a & b -> 'a &&#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&&#95;m⏎ap.py:12⏎f.py:1'; _x_ -> '&&#95;x&&#95;⏎f.py:1'; #count -> '&&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&&#91;id&&#93;/(group⏎)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&&#95;&&#95;eq&&#95⏎;&&#95;⏎f.py:1'; a < b -> 'a &&#60; b⏎f.py:1'
+- 11.14.0 htmlLabels=True: __init__ -> '&_&_init&_&_⏎f.py:1'; merge_base -> 'merge&_base⏎f.py:1'; _private -> '&_private⏎f.py:1'; Map<string, T> -> 'Map&<string, T&>⏎f.py:1'; a*b*c -> 'a&*b&*c⏎f.py:1'; x"y -> 'x&"y⏎f.py:1'; #tag -> '&#tag⏎f.py:1'; a`b`c -> 'a&`b&`c⏎f.py:1'; [x] -> '&[x&]⏎f.py:1'; foo\bar -> 'foo&\\bar⏎f.py:1'; ~x~ -> '&~x&~⏎f.py:1'; a & b -> 'a && b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&_map.py:12⏎f.py:1'; _x_ -> '&_x&_⏎f.py:1'; #count -> '&#count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&[id&]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&_&_eq&_&_⏎f.py:1'; a < b -> 'a &< b⏎f.py:1'
+- 11.14.0 htmlLabels=False: __init__ -> '&&#95;&&#95;init&&#95;&&⏎#95;⏎f.py:1'; merge_base -> 'merge&&#95;base⏎f.py:1'; _private -> '&&#95;private⏎f.py:1'; Map<string, T> -> 'Map&&#60;string, T&&#62;⏎f.py:1'; a*b*c -> 'a&&#42;b&&#42;c⏎f.py:1'; x"y -> 'x&&#34;y⏎f.py:1'; #tag -> '&&#35;tag⏎f.py:1'; a`b`c -> 'a&&#96;b&&#96;c⏎f.py:1'; [x] -> '&&#91;x&&#93;⏎f.py:1'; foo\bar -> 'foo&&#92;bar⏎f.py:1'; ~x~ -> '&&#126;x&&#126;⏎f.py:1'; a & b -> 'a &&#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&&#95;m⏎ap.py:12⏎f.py:1'; _x_ -> '&&#95;x&&#95;⏎f.py:1'; #count -> '&&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&&#91;id&&#93;/(group⏎)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&&#95;&&#95;eq&&#95⏎;&&#95;⏎f.py:1'; a < b -> 'a &&#60; b⏎f.py:1'
+- 11.17.2 htmlLabels=True: __init__ -> '&_&_init&_&_⏎f.py:1'; merge_base -> 'merge&_base⏎f.py:1'; _private -> '&_private⏎f.py:1'; Map<string, T> -> 'Map&<string, T&>⏎f.py:1'; a*b*c -> 'a&*b&*c⏎f.py:1'; x"y -> 'x&"y⏎f.py:1'; #tag -> '&#tag⏎f.py:1'; a`b`c -> 'a&`b&`c⏎f.py:1'; [x] -> '&[x&]⏎f.py:1'; foo\bar -> 'foo&\\bar⏎f.py:1'; ~x~ -> '&~x&~⏎f.py:1'; a & b -> 'a && b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&_map.py:12⏎f.py:1'; _x_ -> '&_x&_⏎f.py:1'; #count -> '&#count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&[id&]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&_&_eq&_&_⏎f.py:1'; a < b -> 'a &< b⏎f.py:1'
+- 11.17.2 htmlLabels=False: __init__ -> '&&#95;&&#95;init&&#95;&&⏎#95;⏎f.py:1'; merge_base -> 'merge&&#95;base⏎f.py:1'; _private -> '&&#95;private⏎f.py:1'; Map<string, T> -> 'Map&&#60;string, T&&#62;⏎f.py:1'; a*b*c -> 'a&&#42;b&&#42;c⏎f.py:1'; x"y -> 'x&&#34;y⏎f.py:1'; #tag -> '&&#35;tag⏎f.py:1'; a`b`c -> 'a&&#96;b&&#96;c⏎f.py:1'; [x] -> '&&#91;x&&#93;⏎f.py:1'; foo\bar -> 'foo&&#92;bar⏎f.py:1'; ~x~ -> '&&#126;x&&#126;⏎f.py:1'; a & b -> 'a &&#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&&#95;m⏎ap.py:12⏎f.py:1'; _x_ -> '&&#95;x&&#95;⏎f.py:1'; #count -> '&&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&&#91;id&&#93;/(group⏎)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&&#95;&&#95;eq&&#95⏎;&&#95;⏎f.py:1'; a < b -> 'a &&#60; b⏎f.py:1'
+- 12.1.0 htmlLabels=True: __init__ -> '&_&_init&_&_⏎f.py:1'; merge_base -> 'merge&_base⏎f.py:1'; _private -> '&_private⏎f.py:1'; Map<string, T> -> 'Map&<string, T&>⏎f.py:1'; a*b*c -> 'a&*b&*c⏎f.py:1'; x"y -> 'x&"y⏎f.py:1'; #tag -> '&#tag⏎f.py:1'; a`b`c -> 'a&`b&`c⏎f.py:1'; [x] -> '&[x&]⏎f.py:1'; foo\bar -> 'foo&\\bar⏎f.py:1'; ~x~ -> '&~x&~⏎f.py:1'; a & b -> 'a && b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/pr&_map.py:12⏎f.py:1'; _x_ -> '&_x&_⏎f.py:1'; #count -> '&#count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&[id&]/(group)/page.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&_&_eq&_&_⏎f.py:1'; a < b -> 'a &< b⏎f.py:1'
+- 12.1.0 htmlLabels=False: __init__ -> '&&#95;&&#95;in⏎it&&#95;&&#95;⏎f.py:1'; merge_base -> 'merge&&#95;ba⏎se⏎f.py:1'; _private -> '&&#95;private⏎f.py:1'; Map<string, T> -> 'Map&&#60;strin⏎g, T&&#62;⏎f.py:1'; a*b*c -> 'a&&#42;b&&#42⏎;c⏎f.py:1'; x"y -> 'x&&#34;y⏎f.py:1'; #tag -> '&&#35;tag⏎f.py:1'; a`b`c -> 'a&&#96;b&&#96⏎;c⏎f.py:1'; [x] -> '&&#91;x&&#93;⏎f.py:1'; foo\bar -> 'foo&&#92;bar⏎f.py:1'; ~x~ -> '&&#126;x&&#12⏎6;⏎f.py:1'; a & b -> 'a &&#38; b⏎f.py:1'; .groundwork/bin/pr_map.py:12 -> '.groundwork/bin/⏎pr&&#95;map.py⏎:12⏎f.py:1'; _x_ -> '&&#95;x&&#95;⏎f.py:1'; #count -> '&&#35;count⏎f.py:1'; app/[id]/(group)/page.tsx -> 'app/&&#91;id&&⏎#93;/(group)/pag⏎e.tsx⏎f.py:1'; obj.__eq__ -> 'obj.&&#95;&&#9⏎5;eq&&#95;&&#⏎95;⏎f.py:1'; a < b -> 'a &&#60; b⏎f.py:1'
+
+### f_markdown_string_raw
+- 11.4.1 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> 'Unsupported markdown: del⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> '⏎f.py:1'; a & b -> 'a &amp; b⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.13.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.13.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.14.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.14.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'
+- 11.17.2 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.17.2 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'
+- 12.1.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 12.1.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> PARSE ERROR; a`b`c -> PARSE ERROR; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'
+
+### g_quote_hash_lt_amp
+- 11.4.1 htmlLabels=True: __init__ -> 'init⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; a`b`c -> 'aUnsupported markdown: codespanc⏎f.py:1'; ~x~ -> 'Unsupported markdown: del⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; _x_ -> 'x⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; _x_ -> 'x⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.13.0 htmlLabels=False: Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.14.0 htmlLabels=False: Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 11.17.2 htmlLabels=False: Map<string, T> -> 'Map&#60;string, T&#62;⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+- 12.1.0 htmlLabels=False: Map<string, T> -> 'Map&#60;string,⏎T&#62;⏎f.py:1'; x"y -> 'x&#34;y⏎f.py:1'; #tag -> '&#35;tag⏎f.py:1'; a & b -> 'a &#38; b⏎f.py:1'; #count -> '&#35;count⏎f.py:1'; a < b -> 'a &#60; b⏎f.py:1'
+
+### h_raw_named_lt_gt_quot
+- 11.4.1 htmlLabels=True: __init__ -> 'init⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; a`b`c -> 'aUnsupported markdown: codespanc⏎f.py:1'; ~x~ -> 'Unsupported markdown: del⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.4.1 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map&lt;string, T&gt;⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&quot;y⏎f.py:1'; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; a & b -> 'a &amp; b⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.12.0 htmlLabels=True: __init__ -> 'init⏎f.py:1'; a*b*c -> 'abc⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj.eq⏎f.py:1'
+- 11.12.0 htmlLabels=False: __init__ -> 'init⏎f.py:1'; Map<string, T> -> 'Map&lt;string, T&gt;⏎f.py:1'; a*b*c -> 'a b c⏎f.py:1'; x"y -> 'x&quot;y⏎f.py:1'; a`b`c -> 'a c⏎f.py:1'; ~x~ -> '⏎f.py:1'; _x_ -> 'x⏎f.py:1'; obj.__eq__ -> 'obj. eq⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.13.0 htmlLabels=False: Map<string, T> -> 'Map&lt;string, T&gt;⏎f.py:1'; x"y -> 'x&quot;y⏎f.py:1'; a < b -> 'a &lt; b⏎f.py:1'
+- 11.14.0 htmlLabels=False: x"y -> 'x&quot;y⏎f.py:1'
+- 11.17.2 htmlLabels=False: x"y -> 'x&quot;y⏎f.py:1'
+- 12.1.0 htmlLabels=False: x"y -> 'x&quot;y⏎f.py:1'
+
+
+## 2. When plain quoted labels stopped being markdown (harness/bisect_markdown.mjs, label "__init__ a*b*c")
+min-11.10.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.11.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.12.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.13.0.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+min-11.14.0.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+min-11.15.0.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+min-11.16.0.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+min-11.17.0.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+min-11.5.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.6.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.7.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.8.0.js html=true: "init abc"  html=false: "init a b c"
+min-11.9.0.js html=true: "init abc"  html=false: "init a b c"
+mermaid.min.js html=true: "init abc"  html=false: "init a b c"
+mermaid.min.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+mermaid.min.js html=true: "__init__ a*b*c"  html=false: "__init__ a*b*c"
+
+## 3. Angle brackets and quotes (harness/probe_lt_quote.mjs)
+m1141/dist/mermaid.min.js	html=true	raw <	"Map"
+m1141/dist/mermaid.min.js	html=true	< + ZWSP	"Map<<ZWSP>string, T>"
+m1141/dist/mermaid.min.js	html=true	#lt; #gt;	"Map<string, T>"
+m1141/dist/mermaid.min.js	html=true	#60; #62;	"Map<string, T>"
+m1141/dist/mermaid.min.js	html=true	&lt; &gt;	"Map<string, T>"
+m1141/dist/mermaid.min.js	html=true	< + space	"Map< string, T>"
+m1141/dist/mermaid.min.js	html=true	#34;	"x\"y"
+m1141/dist/mermaid.min.js	html=true	#quot;	"x\"y"
+m1141/dist/mermaid.min.js	html=true	unquoted x"y	PARSE ERROR
+m1141/dist/mermaid.min.js	html=true	markdown string x"y	PARSE ERROR
+m1141/dist/mermaid.min.js	html=true	raw &amp; text	"a & b"
+m1141/dist/mermaid.min.js	html=false	raw <	"Map"
+m1141/dist/mermaid.min.js	html=false	< + ZWSP	"Map&lt;<ZWSP>string, T&gt;"
+m1141/dist/mermaid.min.js	html=false	#lt; #gt;	"Map&lt;string, T&gt;"
+m1141/dist/mermaid.min.js	html=false	#60; #62;	"Map&#60;string, T&#62;"
+m1141/dist/mermaid.min.js	html=false	&lt; &gt;	"Map&lt;string, T&gt;"
+m1141/dist/mermaid.min.js	html=false	< + space	"Map&lt; string, T&gt;"
+m1141/dist/mermaid.min.js	html=false	#34;	"x&#34;y"
+m1141/dist/mermaid.min.js	html=false	#quot;	"x&quot;y"
+m1141/dist/mermaid.min.js	html=false	unquoted x"y	PARSE ERROR
+m1141/dist/mermaid.min.js	html=false	markdown string x"y	PARSE ERROR
+m1141/dist/mermaid.min.js	html=false	raw &amp; text	"a &amp; b"
+dl/min-11.12.0.js	html=true	raw <	"Map"
+dl/min-11.12.0.js	html=true	< + ZWSP	"Map<<ZWSP>string, T>"
+dl/min-11.12.0.js	html=true	#lt; #gt;	"Map<string, T>"
+dl/min-11.12.0.js	html=true	#60; #62;	"Map<string, T>"
+dl/min-11.12.0.js	html=true	&lt; &gt;	"Map<string, T>"
+dl/min-11.12.0.js	html=true	< + space	"Map< string, T>"
+dl/min-11.12.0.js	html=true	#34;	"x\"y"
+dl/min-11.12.0.js	html=true	#quot;	"x\"y"
+dl/min-11.12.0.js	html=true	unquoted x"y	PARSE ERROR
+dl/min-11.12.0.js	html=true	markdown string x"y	PARSE ERROR
+dl/min-11.12.0.js	html=true	raw &amp; text	"a & b"
+dl/min-11.12.0.js	html=false	raw <	"Map"
+dl/min-11.12.0.js	html=false	< + ZWSP	"Map&lt;<ZWSP>string, T&gt;"
+dl/min-11.12.0.js	html=false	#lt; #gt;	"Map&lt;string, T&gt;"
+dl/min-11.12.0.js	html=false	#60; #62;	"Map&#60;string, T&#62;"
+dl/min-11.12.0.js	html=false	&lt; &gt;	"Map&lt;string, T&gt;"
+dl/min-11.12.0.js	html=false	< + space	"Map&lt; string, T&gt;"
+dl/min-11.12.0.js	html=false	#34;	"x&#34;y"
+dl/min-11.12.0.js	html=false	#quot;	"x&quot;y"
+dl/min-11.12.0.js	html=false	unquoted x"y	PARSE ERROR
+dl/min-11.12.0.js	html=false	markdown string x"y	PARSE ERROR
+dl/min-11.12.0.js	html=false	raw &amp; text	"a &amp; b"
+dl/min-11.13.0.js	html=true	raw <	"Map"
+dl/min-11.13.0.js	html=true	< + ZWSP	"Map<<ZWSP>string, T>"
+dl/min-11.13.0.js	html=true	#lt; #gt;	"Map<string, T>"
+dl/min-11.13.0.js	html=true	#60; #62;	"Map<string, T>"
+dl/min-11.13.0.js	html=true	&lt; &gt;	"Map<string, T>"
+dl/min-11.13.0.js	html=true	< + space	"Map< string, T>"
+dl/min-11.13.0.js	html=true	#34;	"x\"y"
+dl/min-11.13.0.js	html=true	#quot;	"x\"y"
+dl/min-11.13.0.js	html=true	unquoted x"y	PARSE ERROR
+dl/min-11.13.0.js	html=true	markdown string x"y	PARSE ERROR
+dl/min-11.13.0.js	html=true	raw &amp; text	"a & b"
+dl/min-11.13.0.js	html=false	raw <	"Map"
+dl/min-11.13.0.js	html=false	< + ZWSP	"Map&lt;<ZWSP>string, T&gt;"
+dl/min-11.13.0.js	html=false	#lt; #gt;	"Map&lt;string, T&gt;"
+dl/min-11.13.0.js	html=false	#60; #62;	"Map&#60;string, T&#62;"
+dl/min-11.13.0.js	html=false	&lt; &gt;	"Map&lt;string, T&gt;"
+dl/min-11.13.0.js	html=false	< + space	"Map&lt; string, T&gt;"
+dl/min-11.13.0.js	html=false	#34;	"x&#34;y"
+dl/min-11.13.0.js	html=false	#quot;	"x&quot;y"
+dl/min-11.13.0.js	html=false	unquoted x"y	PARSE ERROR
+dl/min-11.13.0.js	html=false	markdown string x"y	PARSE ERROR
+dl/min-11.13.0.js	html=false	raw &amp; text	"a &amp; b"
+dl/min-11.14.0.js	html=true	raw <	"Map"
+dl/min-11.14.0.js	html=true	< + ZWSP	"Map<<ZWSP>string, T>"
+dl/min-11.14.0.js	html=true	#lt; #gt;	"Map<string, T>"
+dl/min-11.14.0.js	html=true	#60; #62;	"Map<string, T>"
+dl/min-11.14.0.js	html=true	&lt; &gt;	"Map<string, T>"
+dl/min-11.14.0.js	html=true	< + space	"Map< string, T>"
+dl/min-11.14.0.js	html=true	#34;	"x\"y"
+dl/min-11.14.0.js	html=true	#quot;	"x\"y"
+dl/min-11.14.0.js	html=true	unquoted x"y	PARSE ERROR
+dl/min-11.14.0.js	html=true	markdown string x"y	PARSE ERROR
+dl/min-11.14.0.js	html=true	raw &amp; text	"a & b"
+dl/min-11.14.0.js	html=false	raw <	"Map"
+dl/min-11.14.0.js	html=false	< + ZWSP	"Map<<ZWSP>string, T>"
+dl/min-11.14.0.js	html=false	#lt; #gt;	"Map<string, T>"
+dl/min-11.14.0.js	html=false	#60; #62;	"Map&#60;string, T&#62;"
+dl/min-11.14.0.js	html=false	&lt; &gt;	"Map<string, T>"
+dl/min-11.14.0.js	html=false	< + space	"Map< string, T>"
+dl/min-11.14.0.js	html=false	#34;	"x&#34;y"
+dl/min-11.14.0.js	html=false	#quot;	"x&quot;y"
+dl/min-11.14.0.js	html=false	unquoted x"y	PARSE ERROR
+dl/min-11.14.0.js	html=false	markdown string x"y	PARSE ERROR
+dl/min-11.14.0.js	html=false	raw &amp; text	"a & b"
+m11172/dist/mermaid.min.js	html=true	raw <	"Map"
+m11172/dist/mermaid.min.js	html=true	< + ZWSP	"Map<<ZWSP>string, T>"
+m11172/dist/mermaid.min.js	html=true	#lt; #gt;	"Map<string, T>"
+m11172/dist/mermaid.min.js	html=true	#60; #62;	"Map<string, T>"
+m11172/dist/mermaid.min.js	html=true	&lt; &gt;	"Map<string, T>"
+m11172/dist/mermaid.min.js	html=true	< + space	"Map< string, T>"
+m11172/dist/mermaid.min.js	html=true	#34;	"x\"y"
+m11172/dist/mermaid.min.js	html=true	#quot;	"x\"y"
+m11172/dist/mermaid.min.js	html=true	unquoted x"y	PARSE ERROR
+m11172/dist/mermaid.min.js	html=true	markdown string x"y	PARSE ERROR
+m11172/dist/mermaid.min.js	html=true	raw &amp; text	"a & b"
+m11172/dist/mermaid.min.js	html=false	raw <	"Map"
+m11172/dist/mermaid.min.js	html=false	< + ZWSP	"Map<<ZWSP>string, T>"
+m11172/dist/mermaid.min.js	html=false	#lt; #gt;	"Map<string, T>"
+m11172/dist/mermaid.min.js	html=false	#60; #62;	"Map&#60;string, T&#62;"
+m11172/dist/mermaid.min.js	html=false	&lt; &gt;	"Map<string, T>"
+m11172/dist/mermaid.min.js	html=false	< + space	"Map< string, T>"
+m11172/dist/mermaid.min.js	html=false	#34;	"x&#34;y"
+m11172/dist/mermaid.min.js	html=false	#quot;	"x&quot;y"
+m11172/dist/mermaid.min.js	html=false	unquoted x"y	PARSE ERROR
+m11172/dist/mermaid.min.js	html=false	markdown string x"y	PARSE ERROR
+m11172/dist/mermaid.min.js	html=false	raw &amp; text	"a & b"
+m1210/dist/mermaid.min.js	html=true	raw <	"Map"
+m1210/dist/mermaid.min.js	html=true	< + ZWSP	"Map<<ZWSP>string, T>"
+m1210/dist/mermaid.min.js	html=true	#lt; #gt;	"Map<string, T>"
+m1210/dist/mermaid.min.js	html=true	#60; #62;	"Map<string, T>"
+m1210/dist/mermaid.min.js	html=true	&lt; &gt;	"Map<string, T>"
+m1210/dist/mermaid.min.js	html=true	< + space	"Map< string, T>"
+m1210/dist/mermaid.min.js	html=true	#34;	"x\"y"
+m1210/dist/mermaid.min.js	html=true	#quot;	"x\"y"
+m1210/dist/mermaid.min.js	html=true	unquoted x"y	PARSE ERROR
+m1210/dist/mermaid.min.js	html=true	markdown string x"y	PARSE ERROR
+m1210/dist/mermaid.min.js	html=true	raw &amp; text	"a & b"
+m1210/dist/mermaid.min.js	html=false	raw <	"Map"
+m1210/dist/mermaid.min.js	html=false	< + ZWSP	"Map<<ZWSP>string, T>"
+m1210/dist/mermaid.min.js	html=false	#lt; #gt;	"Map<string, T>"
+m1210/dist/mermaid.min.js	html=false	#60; #62;	"Map&#60;string,T&#62;"
+m1210/dist/mermaid.min.js	html=false	&lt; &gt;	"Map<string, T>"
+m1210/dist/mermaid.min.js	html=false	< + space	"Map< string, T>"
+m1210/dist/mermaid.min.js	html=false	#34;	"x&#34;y"
+m1210/dist/mermaid.min.js	html=false	#quot;	"x&quot;y"
+m1210/dist/mermaid.min.js	html=false	unquoted x"y	PARSE ERROR
+m1210/dist/mermaid.min.js	html=false	markdown string x"y	PARSE ERROR
+m1210/dist/mermaid.min.js	html=false	raw &amp; text	"a & b"
+
+## 4. Version markers in the trial SVG (drop-shadow-small filter present in mermaid.min.js)
+trial SVG: id=diagram-drop-shadow-small present, edge-animation-slow present
+11.5.0 drop-shadow-small=0
+11.6.0 drop-shadow-small=0
+11.7.0 drop-shadow-small=0
+11.8.0 drop-shadow-small=0
+11.9.0 drop-shadow-small=0
+11.10.0 drop-shadow-small=0
+11.11.0 drop-shadow-small=0
+11.12.0 drop-shadow-small=0
+11.13.0 drop-shadow-small=0
+11.14.0 drop-shadow-small=2
+11.15.0 drop-shadow-small=2
+11.16.0 drop-shadow-small=2
+11.17.0 drop-shadow-small=2
+
+## 5. Theme contrast, stroke-only classDefs, mermaid 11.17.2 (harness/theme_contrast.mjs)
+theme=default html=true node default: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(147, 112, 219) width=1px dash=none stroke/fill=3.23 stroke/github-light=3.76 stroke/github-dark=5.03
+theme=default html=true changed: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(154, 103, 0) width=3px dash=none stroke/fill=4.17 stroke/github-light=4.87 stroke/github-dark=3.89
+theme=default html=true added: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(26, 127, 55) width=3px dash=none stroke/fill=4.36 stroke/github-light=5.08 stroke/github-dark=3.73
+theme=default html=true removed: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(207, 34, 46) width=3px dash=6px, 4px stroke/fill=4.59 stroke/github-light=5.36 stroke/github-dark=3.53
+theme=default html=true neighbour: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(147, 112, 219) width=1px dash=3px, 3px stroke/fill=3.23 stroke/github-light=3.76 stroke/github-dark=5.03
+theme=default html=false node default: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(147, 112, 219) width=1px dash=none stroke/fill=3.23 stroke/github-light=3.76 stroke/github-dark=5.03
+theme=default html=false changed: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(154, 103, 0) width=3px dash=none stroke/fill=4.17 stroke/github-light=4.87 stroke/github-dark=3.89
+theme=default html=false added: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(26, 127, 55) width=3px dash=none stroke/fill=4.36 stroke/github-light=5.08 stroke/github-dark=3.73
+theme=default html=false removed: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(207, 34, 46) width=3px dash=6px, 4px stroke/fill=4.59 stroke/github-light=5.36 stroke/github-dark=3.53
+theme=default html=false neighbour: fill=rgb(236, 236, 255) text=rgb(51, 51, 51) text/fill=10.83 stroke=rgb(147, 112, 219) width=1px dash=3px, 3px stroke/fill=3.23 stroke/github-light=3.76 stroke/github-dark=5.03
+theme=neutral html=true node default: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(153, 153, 153) width=1px dash=none stroke/fill=2.46 stroke/github-light=2.85 stroke/github-dark=6.64
+theme=neutral html=true changed: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(154, 103, 0) width=3px dash=none stroke/fill=4.20 stroke/github-light=4.87 stroke/github-dark=3.89
+theme=neutral html=true added: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(26, 127, 55) width=3px dash=none stroke/fill=4.38 stroke/github-light=5.08 stroke/github-dark=3.73
+theme=neutral html=true removed: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(207, 34, 46) width=3px dash=6px, 4px stroke/fill=4.62 stroke/github-light=5.36 stroke/github-dark=3.53
+theme=neutral html=true neighbour: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(153, 153, 153) width=1px dash=3px, 3px stroke/fill=2.46 stroke/github-light=2.85 stroke/github-dark=6.64
+theme=neutral html=false node default: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(153, 153, 153) width=1px dash=none stroke/fill=2.46 stroke/github-light=2.85 stroke/github-dark=6.64
+theme=neutral html=false changed: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(154, 103, 0) width=3px dash=none stroke/fill=4.20 stroke/github-light=4.87 stroke/github-dark=3.89
+theme=neutral html=false added: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(26, 127, 55) width=3px dash=none stroke/fill=4.38 stroke/github-light=5.08 stroke/github-dark=3.73
+theme=neutral html=false removed: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(207, 34, 46) width=3px dash=6px, 4px stroke/fill=4.62 stroke/github-light=5.36 stroke/github-dark=3.53
+theme=neutral html=false neighbour: fill=rgb(238, 238, 238) text=rgb(0, 0, 0) text/fill=18.10 stroke=rgb(153, 153, 153) width=1px dash=3px, 3px stroke/fill=2.46 stroke/github-light=2.85 stroke/github-dark=6.64
+theme=dark html=true node default: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(204, 204, 204) width=1px dash=none stroke/fill=10.17 stroke/github-light=1.61 stroke/github-dark=11.78
+theme=dark html=true changed: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(154, 103, 0) width=3px dash=none stroke/fill=3.36 stroke/github-light=4.87 stroke/github-dark=3.89
+theme=dark html=true added: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(26, 127, 55) width=3px dash=none stroke/fill=3.22 stroke/github-light=5.08 stroke/github-dark=3.73
+theme=dark html=true removed: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(207, 34, 46) width=3px dash=6px, 4px stroke/fill=3.05 stroke/github-light=5.36 stroke/github-dark=3.53
+theme=dark html=true neighbour: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(204, 204, 204) width=1px dash=3px, 3px stroke/fill=10.17 stroke/github-light=1.61 stroke/github-dark=11.78
+theme=dark html=false node default: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(204, 204, 204) width=1px dash=none stroke/fill=10.17 stroke/github-light=1.61 stroke/github-dark=11.78
+theme=dark html=false changed: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(154, 103, 0) width=3px dash=none stroke/fill=3.36 stroke/github-light=4.87 stroke/github-dark=3.89
+theme=dark html=false added: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(26, 127, 55) width=3px dash=none stroke/fill=3.22 stroke/github-light=5.08 stroke/github-dark=3.73
+theme=dark html=false removed: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(207, 34, 46) width=3px dash=6px, 4px stroke/fill=3.05 stroke/github-light=5.36 stroke/github-dark=3.53
+theme=dark html=false neighbour: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17 stroke=rgb(204, 204, 204) width=1px dash=3px, 3px stroke/fill=10.17 stroke/github-light=1.61 stroke/github-dark=11.78
+
+## 6. Phone width, dark theme, mermaid 11.17.2 (harness/phone_width.mjs)
+file map, 6 boxes	LR	htmlLabels=true	width=1113	height=227	scale@358px=0.32	font=5.1px	scaled height=73px
+file map, 6 boxes	LR	htmlLabels=false	width=1125	height=207	scale@358px=0.32	font=5.1px	scaled height=66px
+file map, 6 boxes	TB	htmlLabels=true	width=556	height=550	scale@358px=0.64	font=10.3px	scaled height=354px
+file map, 6 boxes	TB	htmlLabels=false	width=556	height=491	scale@358px=0.64	font=10.3px	scaled height=316px
+file map, dir on own line	LR	htmlLabels=true	width=870	height=270	scale@358px=0.41	font=6.6px	scaled height=111px
+file map, dir on own line	LR	htmlLabels=false	width=885	height=232	scale@358px=0.40	font=6.5px	scaled height=94px
+file map, dir on own line	TB	htmlLabels=true	width=405	height=646	scale@358px=0.88	font=14.2px	scaled height=571px
+file map, dir on own line	TB	htmlLabels=false	width=406	height=562	scale@358px=0.88	font=14.1px	scaled height=496px
+function map, 25 boxes	LR	htmlLabels=true	width=907	height=1246	scale@358px=0.39	font=6.3px	scaled height=492px
+function map, 25 boxes	LR	htmlLabels=false	width=881	height=1288	scale@358px=0.41	font=6.5px	scaled height=524px
+function map, 25 boxes	TB	htmlLabels=true	width=3085	height=350	scale@358px=0.12	font=1.9px	scaled height=41px
+function map, 25 boxes	TB	htmlLabels=false	width=2997	height=363	scale@358px=0.12	font=1.9px	scaled height=43px
+function map, short labels	LR	htmlLabels=true	width=672	height=1246	scale@358px=0.53	font=8.5px	scaled height=664px
+function map, short labels	LR	htmlLabels=false	width=672	height=1122	scale@358px=0.53	font=8.5px	scaled height=597px
+function map, short labels	TB	htmlLabels=true	width=2248	height=350	scale@358px=0.16	font=2.5px	scaled height=56px
+function map, short labels	TB	htmlLabels=false	width=2249	height=312	scale@358px=0.16	font=2.5px	scaled height=50px
+
+## 7. Diagram rendered in an iframe inside a closed <details> (harness/hidden_details.mjs)
+== node_modules/m11172/dist/mermaid.min.js
+htmlLabels=true details closed at render, opened after: render=ok; viewBox=-8 -8 16 16 shown=16x16 labels=possible|possible|3|3
+htmlLabels=true details open at render: render=ok; viewBox=0 0 411.0625 222 shown=411x222 labels=possible|possible|3|3
+htmlLabels=false details closed at render, opened after: render=ok; viewBox=-8 -8 16 16 shown=16x16 labels=possible|3
+htmlLabels=false details open at render: render=ok; viewBox=0 0 415.9296875 197.19998168945312 shown=416x197 labels=possible|3
+== dl/min-11.14.0.js
+htmlLabels=true details closed at render, opened after: render=ok; viewBox=-8 -8 16 16 shown=16x16 labels=possible|possible|3|3
+htmlLabels=true details open at render: render=ok; viewBox=0 0 411.0625 222 shown=411x222 labels=possible|possible|3|3
+htmlLabels=false details closed at render, opened after: render=ok; viewBox=-8 -8 16 16 shown=16x16 labels=possible|3
+htmlLabels=false details open at render: render=ok; viewBox=0 0 415.9296875 197.19998168945312 shown=416x197 labels=possible|3
+== node_modules/m1141/dist/mermaid.min.js
+htmlLabels=true details closed at render, opened after: render=ok; viewBox=-8 -8 16 16 shown=16x16 labels=possible|possible|3|3
+htmlLabels=true details open at render: render=ok; viewBox=0 0 520.453125 174 shown=520x174 labels=possible|possible|3|3
+htmlLabels=false details closed at render, opened after: render=ok; viewBox=-8 -8 16 16 shown=16x16 labels=possible|3
+htmlLabels=false details open at render: render=ok; viewBox=0 0 524.765625 162 shown=525x162 labels=possible|3

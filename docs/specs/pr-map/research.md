@@ -147,6 +147,44 @@ Added 2026-10-07 after the fifth design review.
   class as not assignable to an interface, and a matching one as
   assignable (C64).
 
+## Addendum for revision 2: how the map displays
+
+Added 2026-10-08 for requirements revision 2. The scripts are in
+`spike/mermaid/`, their output in `spike/mermaid-results.txt`, and an
+excerpt of the trial map's SVG in `spike/trial-map-excerpt.txt`. The tests
+rendered 20 names in Chromium with mermaid 11.4.1, 11.12.0, 11.13.0,
+11.14.0, 11.17.2 and 12.1.0, with htmlLabels on and off, three themes and
+two security levels.
+
+- **Why escape codes showed.** The client that showed the trial map drew
+  labels as SVG text (htmlLabels off) (C66) and runs mermaid 11.14 or
+  later (C73). With htmlLabels off, entity codes such as `#95;` show
+  literally in every version tested (C65). Since 11.13, plain labels are
+  no longer read as markdown, so `_` needs no escaping (C67, C68).
+- **What displays exactly.** Raw text, with `#lt;`, `#gt;` and `#quot;`
+  for `<`, `>` and `"`, displays all 20 names exactly from 11.14 with
+  htmlLabels on, and all but one with it off: `x"y` shows as `x&quot;y`
+  (C69, C70). A raw `<word` is removed as an HTML tag (C71). Python and
+  TypeScript names cannot hold `"`; a path can, which is rare.
+- **Which mermaid GitHub runs is unverified** (C74). On 11.12 and earlier
+  no encoding is exact in both label modes (C67).
+- **Colours.** With no fill set, node text contrast is at least 10:1 in
+  the default, neutral and dark themes (C75). The status strokes
+  `#9a6700`, `#1a7f37` and `#cf222e` reach at least 3:1 against both
+  GitHub backgrounds and every theme's node fill (C76). Stroke width and a
+  dash pattern written with a space are applied (C77).
+- **Collapsed sections.** Mermaid run inside a closed `<details>` draws an
+  empty 16 by 16 SVG that stays empty when opened (C78). A 2022 report says
+  GitHub fails the same way for flowcharts with link labels (C79).
+  Whether github.com renders a diagram only when its section opens is
+  unverified.
+- **Phones.** GitHub Mobile does not render Mermaid (C80). On a 358-pixel
+  column, a 6-file map is 556 pixels wide top-to-bottom and 1,113
+  left-to-right; a 25-box function map is 907 pixels left-to-right and
+  3,085 top-to-bottom (C81). Text stays 12 pixels or larger only up to
+  about 477 pixels wide. The SVG shrinks to the column rather than
+  scrolling (C82).
+
 ## Answers to open questions
 
 - Package line above the diagram: deferred to the owner after version 1, as
@@ -201,6 +239,7 @@ Added 2026-10-07 after the fifth design review.
   source: file:scripts/detect_workarounds.py
   tier: 1
   quote: base = git(root, "merge-base", args.base, "HEAD").strip()
+  override: true when researched on 2026-10-07; pr-map task 1 moved this line into groundwork_config.merge_base, as the design asked
 - id: C3
   claim: The setup skill copies check scripts into the project with a cp line that names the scripts individually.
   source: file:skills/setup/SKILL.md
@@ -561,4 +600,102 @@ Added 2026-10-07 after the fifth design review.
   source: file:docs/specs/pr-map/spike/results.txt
   tier: 1
   quote: "isTypeAssignableTo(Runner, Task): false"
+- id: C65
+  claim: With htmlLabels false, Mermaid entity codes such as #95; display literally (merge&#95;base) in mermaid 11.4.1 through 12.1.0; with htmlLabels true they display as the character.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "a_entities | 20 | 2 | 20 | 2 | 20 | 2 | 20 | 2 | 20 | 2 | 20 | 2 |"
+- id: C66
+  claim: The trial map the owner viewed used SVG text labels (no foreignObject), and its labels showed the entity code literally.
+  source: file:docs/specs/pr-map/spike/trial-map-excerpt.txt
+  tier: 1
+  quote: '<tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> merge&amp;#95;base</tspan>'
+- id: C67
+  claim: Mermaid 11.0 to 11.12 read plain quoted flowchart labels as markdown (__init__ showed as "init", a*b*c as "abc"); from 11.13.0 plain labels are plain text.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: 'min-11.12.0.js html=true: "init abc"'
+- id: C68
+  claim: The mermaid changelog for 11.13.0 records that plain-text flowchart labels are no longer treated as markdown.
+  source: https://raw.githubusercontent.com/mermaid-js/mermaid/develop/packages/mermaid/CHANGELOG.md
+  tier: 1
+  quote: In Mermaid v11, all labels were incorrectly being treated as markdown by default
+  retrieved: 2026-10-08
+- id: C69
+  claim: With raw text plus #lt;, #gt; and #quot;, mermaid 11.14.0, 11.17.2 and 12.1.0 display all 20 test names exactly with htmlLabels true, and all but x"y (shown as x&quot;y) with htmlLabels false; no encoding of a double quote tried displays it with htmlLabels false.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "h_raw_named_lt_gt_quot | 14 | 10 | 16 | 11 | 20 | 17 | 20 | 19 | 20 | 19 | 20 | 19 |"
+- id: C70
+  claim: The mermaid changelog for 11.14.0 records that < and & are no longer escaped when htmlLabels is false.
+  source: https://raw.githubusercontent.com/mermaid-js/mermaid/develop/packages/mermaid/CHANGELOG.md
+  tier: 1
+  quote: "fix: prevent escaping `<` and `&` when `htmlLabels: false`"
+  retrieved: 2026-10-08
+- id: C71
+  claim: A raw <word in a label is removed as an HTML tag in every version and label mode (Map<string, T> shows as Map); theme and securityLevel never changed the displayed text.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "combinations where theme or securityLevel changed the displayed text: 0"
+- id: C72
+  claim: Mermaid documents #quot; and decimal codes such as #9829; as the way to escape characters in flowchart labels.
+  source: https://raw.githubusercontent.com/mermaid-js/mermaid/develop/docs/syntax/flowchart.md
+  tier: 1
+  quote: A["A double quote:#quot;"] --> B["A dec char:#9829;"]
+  retrieved: 2026-10-08
+- id: C73
+  claim: The client that rendered the trial map runs mermaid 11.14.0 or later; its SVG has the drop-shadow-small filter, which first appears in mermaid.min.js in 11.14.0.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "11.14.0 drop-shadow-small=2"
+- id: C74
+  claim: GitHub does not state which mermaid version it uses; its docs tell users to render an info diagram to find out. The version and htmlLabels setting on github.com are unverified.
+  source: https://raw.githubusercontent.com/github/docs/main/content/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams.md
+  tier: 1
+  quote: check the Mermaid version currently in use.
+  retrieved: 2026-10-08
+- id: C75
+  claim: Without a fill class, node text contrast is 10.83:1 in default, 18.10:1 in neutral and 10.17:1 in dark, with htmlLabels true and false.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "theme=dark html=true node default: fill=rgb(31, 32, 32) text=rgb(204, 204, 204) text/fill=10.17"
+- id: C76
+  claim: Strokes #9a6700, #1a7f37 and #cf222e have contrast of at least 3.53:1 against #ffffff and #0d1117 and at least 3.05:1 against the node fill of the default, neutral and dark themes.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "stroke/fill=3.05 stroke/github-light=5.36 stroke/github-dark=3.53"
+- id: C77
+  claim: A classDef stroke-dasharray written with a space (6 4) and stroke-width 3px are applied to the node outline in both label modes.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "width=3px dash=6px, 4px"
+- id: C78
+  claim: Mermaid run in an iframe inside a closed details element produces an empty 16x16 SVG that stays empty after the section is opened (11.4.1, 11.14.0, 11.17.2, both label modes).
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "viewBox=-8 -8 16 16 shown=16x16"
+- id: C79
+  claim: (Quote read by the research worker; github.com is blocked by this environment's proxy, so the checker cannot fetch it.) A mermaid-js issue reports that on GitHub a flowchart with a labelled link inside a collapsed details section fails to render when opened. From 2022, still open; whether github.com still behaves this way is unverified.
+  source: https://github.com/mermaid-js/mermaid/issues/3504
+  tier: 2
+  quote: Putting a TD graph with a labelled link inside such a collapsed section causes it to fail to render when the section is clicked.
+  retrieved: 2026-10-08
+  status: unverified
+- id: C80
+  claim: (Quote read by the research worker; github.com is blocked by this environment's proxy, so the checker cannot fetch it.) GitHub Mobile (Android and iOS) does not render Mermaid. Gap - a community thread with a staff answer, not documentation; the latest report is from 2025.
+  source: https://github.com/orgs/community/discussions/144793
+  tier: 2
+  quote: This is still in our backlog, and unfortunately, we don't have this in our plans to implement short-term
+  retrieved: 2026-10-08
+  status: unverified
+- id: C81
+  claim: On a 358px column, a 6-box file map is 1113px wide in LR and 556px in TB (405px with the directory on its own line); a 25-box function map is 907px in LR, 3085px in TB, and 672px in LR with short labels.
+  source: file:docs/specs/pr-map/spike/mermaid-results.txt
+  tier: 1
+  quote: "function map, 25 boxes TB htmlLabels=true width=3085"
+- id: C82
+  claim: The trial SVG is sized width 100% with max-width equal to its natural width, so on a narrow screen it shrinks instead of scrolling.
+  source: file:docs/specs/pr-map/spike/trial-map-excerpt.txt
+  tier: 1
+  quote: 'width="100%" class="flowchart" style="max-width: 5316.34375px;"'
 ```

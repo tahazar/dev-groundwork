@@ -1,0 +1,17 @@
+{
+  "name": "mermaid-research",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "m11172": "npm:mermaid@^11.17.2",
+    "m1141": "npm:mermaid@^11.4.1",
+    "m1210": "npm:mermaid@^12.1.0"
+  }
+}

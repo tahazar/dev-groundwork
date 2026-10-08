@@ -43,5 +43,30 @@ make them pass.
   until this passes) Recorded in `trial.md`: it did not pass, and AC-22
   stays deferred until the follow-up tasks listed there (11a to 11g) are
   done.
+Follow-ups from the trial (`trial.md`, "Proposed follow-ups"), and
+revision 2 (design, "Revision 2"). The owner approved 11a to 11f and
+skipping `.groundwork/` on 2026-10-08.
+
+- [ ] R0. Step 0: the owner checks the test comment on
+  ableton-workflow-helper #33 (collapsed sections, mermaid version). The
+  build waits for the answer.
+- [ ] R1. Acceptance tests for revision 2 (stage 4): the new criteria, and
+  each changed assertion in `test_render.py` with its reason. Approved
+  before R2. (AC-11, AC-12, AC-23 to AC-30)
+- [ ] 11a. Match names within one language. (AC-7)
+- [ ] 11b. A fresh jedi `Script` per query or per box. (AC-5)
+- [ ] 11c. Constructor candidates only at calls and `new`. (AC-7)
+- [ ] 11e. Guard the `groundwork_config` import like the package imports.
+  (AC-20)
+- [ ] 11f. Name the right reason when an import resolves. (AC-6)
+- [ ] R2. Skip `.groundwork/` and count it in the notes (11d); add
+  `files` to the map. (AC-23 data, AC-30)
+- [ ] R3. Labels and outlines: the three-character escape, no fills, the
+  outline classes. (AC-28, AC-29)
+- [ ] R4. The file map. (AC-23, AC-24)
+- [ ] R5. File sections, the collapse, splitting per diagram, and the 422
+  shrinking order. (AC-11, AC-12, AC-14, AC-25 to AC-27)
+- [ ] 11g. Second trial in ableton-workflow-helper, viewed on a phone and
+  in dark mode.
 - [ ] 12. Documentation: README rows for the new check and its install
   needs, and a line in `docs/pipeline.md`.
