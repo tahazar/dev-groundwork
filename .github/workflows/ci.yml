@@ -31,3 +31,26 @@ jobs:
       - name: Detect workarounds
         if: github.event_name == 'pull_request'
         run: python scripts/detect_workarounds.py --base "origin/${{ github.base_ref }}"
+
+  pr-map:
+    name: pr-map tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Install pr-map packages
+        run: |
+          python -m pip install -r scripts/pr_map/requirements.txt
+          npm ci --prefix scripts/pr_map
+      - name: Unit tests
+        run: python -m unittest discover -s tests_pr_map -p "unit_*.py" -v
+      - name: Acceptance tests (ratchet)
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name CI
+          python tests_pr_map/ratchet.py
