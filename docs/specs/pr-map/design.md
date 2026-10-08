@@ -1,6 +1,6 @@
 # Design: pr-map
 
-- Status: approved (2026-10-08, by the owner; five fresh-context reviews, the last round of fixes not re-reviewed by the owner's choice)
+- Status: revision 1 approved (2026-10-08, by the owner; five fresh-context reviews, the last round of fixes not re-reviewed by the owner's choice). Revision 2 ("Revision 2" at the end) awaiting review
 - Requirements: `requirements.md`; research: `research.md`
 
 ## Context
@@ -443,6 +443,7 @@ class Arrow:
        reason. The comment says so, and a warning is logged. This is the
        only fallback, and it is tested in both directions.
 8. **Render** (AC-8, AC-10 to AC-13, AC-17, AC-19).
+   *Replaced by "Revision 2" below; kept for the history of splitting.*
    - **Header:** "Computed from `<base short sha>` (base) to `<head short
      sha>` (head)."
    - **No constructs:** "No function-level changes to map".
@@ -676,3 +677,248 @@ class Arrow:
 12. **Actions pinned:** checkout and setup-python reuse this repository's
     pins; setup-node and upload-artifact are pinned to the commits their
     release tags resolve to.
+
+## Revision 2: file map and file sections
+
+Requirements revision 2 (2026-10-08) changes how the map is laid out, not
+how it is computed. Steps 1 to 7 of the pipeline stay as they are, except
+that `.groundwork/` is left out (AC-30). Step 8 is replaced.
+
+### Context
+
+The trial (`trial.md`) drew one diagram of 180 boxes. The owner read it on
+a phone in dark mode and found three problems:
+
+- **It was too big.** The canvas was 5,316 by 13,888 pixels. 152 of the
+  180 boxes came from `.groundwork/`, which holds copies of this plugin's
+  scripts, not the project's code.
+- **Dark mode was unreadable.** The dark theme sets light text, and the
+  status classes forced light fills, so changed and added boxes had light
+  text on a light fill (`spike/trial-map-excerpt.txt`).
+- **Escape codes showed.** `merge_base` displayed as `merge&#95;base`.
+  The client drew labels as SVG text, which does not decode
+  Mermaid's entity codes (C65, C66).
+
+### Options
+
+#### Option R1: the layout is a view, computed in `render.py`
+
+`build_map` keeps producing boxes and arrows. It adds only what the
+renderer cannot know: each changed file's diff status (`files`). `render.py`
+groups boxes by path for the file map, and picks each changed file's boxes
+and the arrows touching them for its section.
+
+- Every box and arrow still has one source: the function map. File arrows
+  are counts over it, made when the comment is written.
+- The JSON stays the same apart from `files`, so the locked graph tests
+  and version 2's overlay are unaffected.
+- The renderer grows: grouping, sections and the AC-27 collapse all live
+  in it.
+
+#### Option R2: the file level is part of the map's data
+
+`build_map` also returns `file_boxes` and `file_arrows` (path, status,
+counts, certainty), and each box carries its section. `render.py` only
+draws.
+
+- At its strongest: the file level becomes testable from the JSON without
+  parsing Markdown, version 2's overlay can cite file arrows directly, and
+  the renderer stays a printer.
+- The JSON gains a second, derived copy of the arrows. Every change to the
+  graph has to keep both in step, which is what project rule 4 forbids.
+
+### Comparison
+
+| | R1: view in the renderer | R2: file level in the data |
+|---|---|---|
+| Work left to callers | None: `render_comment(map, run_url)` as today | None |
+| New representations | `files`: the diff status per changed file, which the map does not hold yet | `files`, plus file boxes and file arrows derived from the arrows (rule 4) |
+| Tests | Rendered comment, as today's render tests do | JSON for the file level, comment for the layout |
+| Size and risk | `render.py` grows; `pr_map.py` adds one field | Both grow; the JSON format changes for version 2 |
+
+### Decision
+
+**R1.** It meets every criterion with one new field and no copy of the
+arrows. The file level is a way of drawing the arrows, not a fact about
+the code, so it belongs where drawing happens. R2's testability gain is
+small: the render tests already read the comment.
+
+**Rejected: R2.** A second representation of the arrows (rule 4), for a
+benefit no criterion asks for. Revisit if version 2 needs file arrows in
+the JSON; they can be computed from the arrows then.
+
+### Step 0: check on GitHub before the build
+
+Two facts decide whether this layout works, and neither can be measured
+outside GitHub:
+
+- **Collapsed sections.** Mermaid run inside a closed `<details>` draws an
+  empty diagram that stays empty when opened (C78). A 2022 report says
+  GitHub fails the same way when an arrow has a label (C79), and section
+  diagrams have `possible` labels (AC-6).
+- **The mermaid version** github.com runs (C74), which decides whether
+  the labels above are exact.
+
+A test comment on the trial pull request (ableton-workflow-helper #33)
+holds an `info` diagram, the labels and outlines above, and two collapsed
+sections, with and without an arrow label. The owner checks it in a
+desktop browser, a phone browser and the app used for the trial.
+
+- **If collapsed diagrams render when opened:** build as designed.
+- **If they do not:** the sections cannot be collapsed and still show
+  diagrams. AC-25 goes back to the owner. The choices are open sections
+  under a heading, or collapsed sections with the diagram above the
+  `<details>`.
+- **If GitHub runs mermaid 11.12 or older:** the label rule changes before
+  the build, and the measurements are rerun for that version.
+
+### Changes to the pipeline
+
+**Step 1, base and files** (AC-30).
+- `.groundwork/` is left out with the other skipped paths: changed files
+  under it are not parsed, and the whole-repository scan in step 2 does not
+  read it, so its functions are neither boxes nor neighbours.
+- The count of changed source files left out this way goes in the notes
+  as `left_out: {".groundwork/": n}`.
+- The prefix is a constant in `pr_map.py`. `SKIP_DIRS` in
+  `groundwork_config.py` is not changed, because the other checks that use
+  it are outside this revision.
+
+**The map gains `files`**: `{path: "changed" | "added" | "removed"}` for
+each changed source file, from the `--name-status` letters (a rename is
+"changed" under its new path, and its old path is not listed). A file in
+the map with no entry is "unchanged".
+
+**Step 8, render** (AC-8, AC-10 to AC-13, AC-17, AC-19, AC-23 to AC-29).
+The comment, in order:
+
+1. **Header**, counts and legend, as today.
+2. **File map** (AC-23, AC-24). One Mermaid diagram.
+   - One box per path that holds a box. Label: `<status>: <path>`.
+   - One arrow per ordered pair of different files with at least one arrow
+     between their boxes. Its label is the count. It is solid (`-->`) when
+     any of those arrows is exact, and dashed with `possible, <count>`
+     otherwise.
+   - Arrows within one file are not drawn here.
+3. **File sections** (AC-25 to AC-27), one per path that holds a changed,
+   added or removed box, in path order. Each is
+   `<details><summary>` with the path and
+   `<n> changed, <n> added, <n> removed; <n> callers, <n> callees`.
+   - *Anchors* are the file's changed, added and removed boxes. The
+     section draws every arrow that touches an anchor, and the boxes at
+     both ends. Callers and callees are the distinct boxes at the other end
+     of those arrows, counted once each even when they are anchors too.
+   - **Collapse** (AC-27). When more than 25 of a section's boxes are in
+     other files, those boxes are drawn as one box per other file:
+     `<path>: <n> functions`. Their arrows are merged per file, anchor and
+     direction, with the same count and solid-or-dashed rule as the file
+     map. Under the diagram, the section lists each collapsed box by name,
+     grouped by file. Boxes in the section's own file are never collapsed.
+   - Splitting (AC-12) reuses `split()` on each diagram, the file map
+     included, with the same budgets.
+4. **Notes**, as today, plus the `.groundwork/` count (AC-30).
+5. **Text list**, as today (AC-13): every arrow, unchanged by the
+   collapse, so a collapsed box can still be searched for by name.
+
+**Labels** (AC-29). Names and paths are written raw. Only three characters
+are replaced, with the entity names Mermaid documents (C72): `<` with
+`#lt;`, `>` with `#gt;`, and `"` with `#quot;`. Lines stay separated by a
+newline. This replaces `MERMAID_ESCAPES`.
+- From mermaid 11.14 this shows every tested name exactly with HTML labels,
+  and every name but one with SVG text labels (C69). The exception is a
+  `"`, which Python and TypeScript names cannot hold.
+- A raw `<` is not an option: `Map<string, T>` would show as `Map` (C71).
+- The underscore needs no escape, because plain labels stopped being
+  read as markdown in 11.13 (C67, C68).
+- **Gaps.** Which mermaid version github.com runs is unverified (C74).
+  On 11.12 or earlier, `__init__` would show as a bold "init", and no
+  encoding is exact in both label modes (C67). A path holding `#` followed
+  by a word and `;` would read as an entity code. Step 0 below checks the
+  version on GitHub.
+
+**Theme** (AC-28). No diagram sets a fill or a text colour. Status is shown
+by the label text, as now, and by the outline:
+
+| Status | Outline |
+|---|---|
+| changed | `stroke:#9a6700,stroke-width:3px` (solid) |
+| added | `stroke:#1a7f37,stroke-width:3px,stroke-dasharray:8 4` |
+| removed | `stroke:#cf222e,stroke-width:3px,stroke-dasharray:2 4` |
+| neighbour, unchanged file | none: the theme's 1-pixel outline |
+
+- With no fill set, text contrast is at least 10:1 in the default,
+  neutral and dark themes (C75).
+- The three strokes reach at least 3:1 against both GitHub backgrounds and
+  every theme's node fill (C76), the contrast WCAG asks of graphics.
+- Width and dash tell the statuses apart without colour (C77). The dash
+  numbers are written with a space, because a comma separates properties
+  in a `classDef`.
+- File map boxes use the same classes by file status.
+
+**Direction.** The file map is `flowchart TB`, with each box's file
+name on the first line and its directory on the second. On a 358-pixel
+phone column, six files then take 405 pixels instead of 1,113 left to
+right (C81). Function diagrams stay `flowchart LR`, which is narrower than
+top to bottom for them (907 against 3,085 pixels for 25 boxes, C81).
+- The SVG shrinks to fit the column rather than scrolling (C82), so a wide
+  diagram gets small text instead of being cut off. Text stays 12 pixels or
+  larger only up to about 477 pixels wide (C81); a section near the AC-27
+  limit of 25 will need zooming. The limit is a constant, set to 25 as
+  approved.
+- GitHub Mobile does not render Mermaid at all (C80). There the section
+  titles, the notes and the text list carry the map on their own.
+
+**Shrinking for 422** (AC-14), in order: the text list moves out; then
+file sections, last first, one per version; then the file map; last, the
+header, counts and link. Each version says what moved.
+
+### Tests (revision 2)
+
+The acceptance tests change with the criteria. That stage lists every
+changed assertion and why. Expected changes to `test_render.py`:
+
+- Tests that count diagrams (`len(parts) == 1`) count the diagrams in one
+  section instead, because the comment now holds a file map too.
+- The text-list test finds the text list by its summary, because file
+  sections are `<details>` too.
+- The 600-caller test stays (every box and arrow is still drawn), but
+  looks for collapsed callers in the section's list and the text list.
+
+New tests, one or more per new criterion: the file map's boxes, counts and
+arrow styles (AC-23, AC-24); section order, titles and contents (AC-25,
+AC-26); the collapse at 26 and not at 25 (AC-27); no `fill` or `color` in
+any diagram (AC-28); labels that keep `merge_base` and `__init__` raw, write `Map<string, T>` as `Map#lt;string, T#gt;`, and contain no decimal entity code (AC-29); and a fixture with a
+`.groundwork/` file changed and called (AC-30).
+
+### Criteria coverage (revision 2)
+
+| Criterion | How the design meets it |
+|---|---|
+| AC-11 | Every box and arrow is in the section of each changed file it touches, and in the text list; the collapse lists collapsed boxes by name |
+| AC-12 | `split()` on the file map and on each section's diagram |
+| AC-23 | File map: one box per path, labelled with path and status from `files` |
+| AC-24 | File arrows counted over the function map; solid if any is exact |
+| AC-25 | One `<details>` per file with an anchor, path order, counts in the summary |
+| AC-26 | Section draws the arrows touching its anchors and their ends |
+| AC-27 | Collapse when more than 25 boxes are in other files; names listed under the diagram |
+| AC-28 | No `fill` or `color` in any diagram; status in the label text and the outline (C75 to C77) |
+| AC-29 | Raw names except `<`, `>` and `"` (C69, C71); the version on GitHub checked in step 0 (C74) |
+| AC-30 | `.groundwork/` prefix skipped in steps 1 and 2; count in the notes |
+
+### Project rules check (revision 2)
+
+1. **Reuse:** `split()`, `mermaid()`, `_text_list()` and `_notes()` are
+   reused; the file map is drawn by the same `mermaid()`.
+2. **Simplest design:** no new module or option. The collapse threshold
+   is a constant, as the budgets are.
+4. **One representation:** file arrows are computed when drawing, not
+   stored (see the rejected R2).
+5. **Tests from criteria:** the render tests use hand-built maps, as
+   today; AC-30 uses a fixture repository.
+6. **Never weaken a check:** changed assertions are listed in the
+   acceptance-test stage with the criterion that changed them.
+8. **Sources:** the label, colour and size choices rest on measurements in
+   `spike/mermaid/` (C65 to C78, C81, C82). Three facts are unverified:
+   github.com's mermaid version (C74), collapsed sections on GitHub (C79,
+   Tier 2), and GitHub Mobile (C80, Tier 2). Step 0 checks the first two
+   on GitHub itself before the build.
