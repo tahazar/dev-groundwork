@@ -1,0 +1,4 @@
+# Acceptance tests that pass; tests_pr_map/ratchet.py fails CI if any of them fails.
+# One unittest id per line, as run from tests_pr_map/, for example:
+#   test_boxes.BoxTests.test_body_change_marks_function_changed
+# Tasks only ever add lines.

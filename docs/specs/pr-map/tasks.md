@@ -9,7 +9,7 @@ make them pass.
   (`merge_base`, `diff_against`), and switch `detect_workarounds.py` and
   `check_ac_coverage.py` to it. A refactor with no behaviour change: the
   existing tests pass unchanged. (prerequisite; research's duplicate)
-- [ ] 2. `scripts/pr_map/` skeleton: pinned `requirements.txt`,
+- [x] 2. `scripts/pr_map/` skeleton: pinned `requirements.txt`,
   `package.json` and `package-lock.json`, the `tests_pr_map/` directory
   with the fixture builders, and a CI job in this repository that installs
   them and runs the tests. (AC-9, groundwork for the rest)
