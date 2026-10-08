@@ -9,20 +9,18 @@ box it really refers to, or UNCERTAIN where the code itself does not decide.
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts" / "pr_map"))
-sys.path.insert(0, str(ROOT / "tests"))
+import _paths
+import pr_map
+import render
+from test_scripts import Repo, git
 
-import pr_map  # noqa: E402
-import render  # noqa: E402  (re-exported for the tests)
-from test_scripts import Repo, git  # noqa: E402
+__all__ = ["ROOT", "UNCERTAIN", "Map", "MapRepo", "box_id", "pr_map", "render"]
 
-__all__ = ["UNCERTAIN", "Map", "MapRepo", "box_id", "pr_map", "render"]
+ROOT = _paths.ROOT
 
 UNCERTAIN = "uncertain"
 
