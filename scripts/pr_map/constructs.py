@@ -19,7 +19,7 @@ from pathlib import Path
 
 import tree_sitter_python
 import tree_sitter_typescript
-from tree_sitter import Language, Node, Parser, Query, QueryCursor
+from tree_sitter import Language, Node, Parser, Query, QueryCursor, Tree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from groundwork_config import walk_files
@@ -69,6 +69,7 @@ class Construct:
     start_line: int  # 1-based, including decorators and `export`
     end_line: int  # 1-based, inclusive
     parent: str | None  # id of the innermost construct around this one
+    bases: tuple[tuple[int, int], ...] = ()  # Python class: name position of each base class, in order
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,12 @@ def _grammar(suffix: str) -> tuple[Parser, Query]:
 def char_column(line: bytes, byte_column: int) -> int:
     """Characters before byte_column in a UTF-8 line."""
     return len(line[:byte_column].decode("utf-8"))
+
+
+def syntax(path: str, source: bytes) -> Tree:
+    """The tree-sitter tree of one file; path's suffix picks the grammar."""
+    parser, _ = _grammar(Path(path).suffix)
+    return parser.parse(source)
 
 
 def parse(path: str, source: bytes) -> FileConstructs:
@@ -210,6 +217,7 @@ def parse(path: str, source: bytes) -> FileConstructs:
                 start_line=_start(group[0][0]).start_point[0] + 1,
                 end_line=group[-1][0].end_point[0] + 1,
                 parent=ids[parents[index]] if parents[index] is not None else None,
+                bases=tuple(position(base) for base in _base_names(group[0][0])),
             )
         )
 
@@ -278,6 +286,24 @@ def _next_declaration(node: Node) -> Node | None:
     while following is not None and following.type in ("comment", "decorator"):
         following = following.next_named_sibling
     return following
+
+
+def _base_names(node: Node) -> list[Node]:
+    """For a Python class, the name node of each base class: `C` in `C`, `m.C` and `C[int]`.
+
+    Keyword arguments (`metaclass=M`) and splats are not base classes the
+    source names, so they are left out.
+    """
+    superclasses = node.child_by_field_name("superclasses") if node.type == "class_definition" else None
+    names = []
+    for base in superclasses.named_children if superclasses is not None else ():
+        while base.type == "subscript":
+            base = base.child_by_field_name("value")
+        if base.type == "attribute":
+            base = base.child_by_field_name("attribute")
+        if base.type == "identifier":
+            names.append(base)
+    return names
 
 
 def _object_holder(node: Node) -> str | None:

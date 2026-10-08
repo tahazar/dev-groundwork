@@ -172,6 +172,19 @@ class SiteTests(unittest.TestCase):
             self.assertEqual(sites.get(name), call, name)
 
 
+class BaseTests(unittest.TestCase):
+    def test_python_base_names_in_order(self):
+        source = "class A(B, m.C, G[int], metaclass=M, *xs):\n    pass\n\n\nclass D:\n    pass\n"
+        found = by_id(parse("lib.py", source))
+        line = source.splitlines()[0]
+        self.assertEqual(found["lib.py::A"].bases, ((1, line.index("B")), (1, line.index("C")), (1, line.index("G"))))
+        self.assertEqual(found["lib.py::D"].bases, ())
+
+    def test_base_columns_are_characters(self):
+        found = by_id(parse("lib.py", "class Ä(Bäse):\n    pass\n"))
+        self.assertEqual(found["lib.py::Ä"].bases, ((1, 8),))
+
+
 class OverloadTests(unittest.TestCase):
     def test_signatures_and_implementation_are_one_construct(self):
         parsed = parse(
