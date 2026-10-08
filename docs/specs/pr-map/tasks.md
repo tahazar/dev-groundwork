@@ -27,7 +27,7 @@ make them pass.
 - [x] 7. Graph assembly: candidates from both sources, verdicts, callers of
   removed boxes, overrides and implementations, unresolved calls, JSON
   output. (AC-3, AC-4, AC-6, AC-7, AC-11)
-- [ ] 8. `render.py`: Mermaid diagrams, splitting under the budgets, the
+- [x] 8. `render.py`: Mermaid diagrams, splitting under the budgets, the
   text list, header and notes. (AC-8, AC-10 to AC-13, AC-17, AC-19)
 - [ ] 9. `github.py` and the entry point: comment upsert by marker and
   author, the 403 and fork path, the 422 shrinking sequence, job summary,

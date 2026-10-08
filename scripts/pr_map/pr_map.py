@@ -12,8 +12,8 @@ GITHUB_SERVER_URL, GITHUB_RUN_ID).
 
 Design: docs/specs/pr-map/design.md. build_map runs Pipeline steps 1 to 6:
 the boxes, then the arrows between them and their neighbours (connect).
-The comment body and posting are still stubs; the acceptance tests in
-tests_pr_map/ define their behaviour.
+render.render_comment writes the comment body (step 8). Posting is still a
+stub; the acceptance tests in tests_pr_map/ define its behaviour.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import constructs
+import render
 import resolve
 from constructs import Construct, FileConstructs, Site
 from resolve import CALLEE, CALLER, REMOVED, Answer, Candidate, Code, Resolver, ResolverError
@@ -497,8 +498,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
-        (args.out / "pr-map.json").write_text(json.dumps(build_map(project_root(), args.base)), encoding="utf-8")
-        (args.out / "pr-map.md").write_text("", encoding="utf-8")
+        data = build_map(project_root(), args.base)
+        (args.out / "pr-map.json").write_text(json.dumps(data), encoding="utf-8")
+        (args.out / "pr-map.md").write_text(render.render_comment(data, ""), encoding="utf-8")
     return 0
 
 
