@@ -20,7 +20,7 @@ make them pass.
   innermost attribution of changed lines. (AC-1, AC-2, AC-3, AC-10)
 - [x] 5. Python resolver: `definition_at` and reference search with jedi,
   and the verdict rules. (AC-4 to AC-7 for Python)
-- [ ] 6. TypeScript resolver: `resolve_ts.cjs`, the `paths` mapping for
+- [x] 6. TypeScript resolver: `resolve_ts.cjs`, the `paths` mapping for
   workspace packages, and the Python side of the protocol, including the
   fallback when Node or the helper is unavailable. (AC-4 to AC-7 for
   TypeScript)

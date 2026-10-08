@@ -6,16 +6,24 @@ verdict functions below are pure, so graph assembly can feed them
 candidates and answers from any language.
 
 Python answers come from jedi in this process: `Script.goto` with
-`follow_imports` (research.md C41) and `Script.get_references` (C17b). A
-TypeScript resolver goes behind the same `definition_at` signature; until it
-exists, a TypeScript file raises ResolverError, which the verdicts read as
-"resolver failed".
+`follow_imports` (research.md C41) and `Script.get_references` (C17b).
+TypeScript answers come from the Node helper resolve_ts.cjs, which runs the
+pinned TypeScript LanguageService (C36, C13) and talks one JSON object per
+line over standard input and output. When Node or the helper is missing, or
+the helper dies or stops answering, every TypeScript request raises
+ResolverError with that reason, which the verdicts read as "resolver failed".
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import queue
+import subprocess
+import threading
+from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import constructs
@@ -33,6 +41,15 @@ jedi.settings.dynamic_params_for_other_modules = False
 
 PROJECT_MARKERS = ("pyproject.toml", "setup.cfg", "setup.py")
 CONSTRUCTORS = {"__init__", "__new__"}
+
+TYPESCRIPT = (".ts", ".tsx")
+HELPER = Path(__file__).resolve().parent / "resolve_ts.cjs"
+# Seconds the helper may take over one answer. The first request in a project
+# builds its program, which takes seconds on a large repository; a helper that
+# takes longer is stopped and treated as failed (design, workflow "Hangs").
+HELPER_TIMEOUT = 120.0
+
+log = logging.getLogger("pr_map")
 
 CALLER, CALLEE, REMOVED = "caller", "callee", "removed"
 
@@ -53,7 +70,7 @@ class Location:
     path: str | None  # relative to the repository root; None outside it (a library, the standard library)
     line: int  # 1-based
     column: int  # 0-based character column
-    kind: str  # jedi's Name.type ("function", "class", "param", "statement", ...)
+    kind: str  # jedi's Name.type ("function", "class", "param", ...) or TypeScript's DefinitionInfo.kind
     name: str  # dotted full name where the resolver knows it, else the bare name
     local: bool = False  # a parameter, or a variable assigned inside a function
 
@@ -70,6 +87,7 @@ class Candidate:
     role: str  # CALLER or REMOVED (of target), or CALLEE (of the box around the site)
     target: str | None = None  # box id; None for a callee
     through: str = ""  # a runtime class (`cls`, `type(self)`) that may run target: always possible
+    referenced: bool = False  # TypeScript: the site came from the target's own findReferences (C43 to C45, C54)
 
 
 @dataclass(frozen=True)
@@ -107,6 +125,8 @@ class Code:
     constructs: Mapping[str, Construct]  # every construct in the head commit, and removed ones, by id
     positions: Mapping[tuple[str, int, int], str]  # every head name position -> construct id
     bases: Mapping[str, tuple[str, ...]]  # Python class id -> its bases: class ids, or names outside the repository
+    # TypeScript method id -> the interface members it may be called through by shape (Resolver.structural)
+    implements: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
 
 def index(files: Iterable[FileConstructs]) -> tuple[dict[str, Construct], dict[tuple[str, int, int], str]]:
@@ -121,17 +141,157 @@ def index(files: Iterable[FileConstructs]) -> tuple[dict[str, Construct], dict[t
     return by_id, positions
 
 
+class TypeScript:
+    """The Node helper resolve_ts.cjs, started on first use and asked one request at a time.
+
+    This is pr-map's one fallback (design, step 7): when Node or the helper
+    is missing, or the helper dies or does not answer within HELPER_TIMEOUT,
+    a warning is logged once, failure records why, and this request and
+    every later one raise ResolverError with that reason. The verdicts turn
+    those into possible arrows, "resolver failed: ...".
+    """
+
+    def __init__(
+        self,
+        root: Path,
+        packages: Sequence[str],
+        node: str = "node",
+        helper: Path = HELPER,
+        timeout: float = HELPER_TIMEOUT,
+    ):
+        self.root = root
+        self.packages = list(packages)  # workspace package directories, relative to root
+        self.node = node
+        self.helper = helper
+        self.timeout = timeout
+        self.failure = ""
+        self._process: subprocess.Popen | None = None
+        self._answers: queue.Queue[str | None] = queue.Queue()
+        self._stderr: deque[str | None] = deque(maxlen=100)
+        self._threads: list[threading.Thread] = []
+        self._next_id = 0
+
+    def ask(self, request: dict) -> dict:
+        """Send one request and return its answer; raises ResolverError when the helper fails or answers an error."""
+        if self.failure:
+            raise ResolverError(f"TypeScript resolver unavailable: {self.failure}")
+        if self._process is None:
+            self._start()
+        self._next_id += 1
+        line = json.dumps({"id": self._next_id, **request}) + "\n"
+        try:
+            self._process.stdin.write(line)
+            self._process.stdin.flush()
+        except OSError as exc:
+            raise self._fail(f"the helper stopped reading requests ({exc})") from exc
+        try:
+            text = self._answers.get(timeout=self.timeout)
+        except queue.Empty as exc:
+            raise self._fail(f"the helper gave no answer within {self.timeout:g} s") from exc
+        if text is None:
+            self._process.wait()
+            raise self._fail(f"the helper exited with code {self._process.returncode}{self._last_stderr()}")
+        try:
+            answer = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise self._fail(f"the helper wrote something that is not JSON: {text[:200]!r}") from exc
+        if answer.get("id") != self._next_id:
+            raise self._fail(f"the helper answered request {answer.get('id')} instead of {self._next_id}")
+        if "error" in answer:
+            raise ResolverError(f"TypeScript {request['op']}: {answer['error']}")
+        return answer
+
+    def close(self) -> None:
+        """Ask the helper to exit by closing its input, stop it if it does not, and close the pipes."""
+        if self._process is None:
+            return
+        if self._process.poll() is None:
+            try:
+                self._process.stdin.close()
+                self._process.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                self._process.kill()
+                self._process.wait()
+        for thread in self._threads:
+            thread.join(timeout=5)
+        for stream in (self._process.stdin, self._process.stdout, self._process.stderr):
+            try:
+                stream.close()
+            except BrokenPipeError:
+                pass  # unsent input to a helper that already exited: nothing is waiting for it
+
+    def _start(self) -> None:
+        if not self.helper.is_file():
+            raise self._fail(f"the helper {self.helper} is missing")
+        command = [self.node, str(self.helper), str(self.root), json.dumps(self.packages)]
+        try:
+            self._process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise self._fail(f"Node could not be started as {self.node!r} ({exc})") from exc
+        self._threads = [
+            threading.Thread(target=self._read, args=(self._process.stdout, self._answers.put), daemon=True),
+            threading.Thread(target=self._read, args=(self._process.stderr, self._stderr.append), daemon=True),
+        ]
+        for thread in self._threads:
+            thread.start()
+
+    @staticmethod
+    def _read(stream, put) -> None:
+        """Pass each line of stream to put, then None at its end (stdout's end means the helper exited)."""
+        for line in stream:
+            put(line.rstrip("\n"))
+        put(None)
+
+    def _last_stderr(self) -> str:
+        """Node's error line from the helper's standard error ("Error: Cannot find module 'typescript'")."""
+        for thread in self._threads[1:]:
+            thread.join(timeout=5)
+        lines = [line for line in self._stderr if line]
+        errors = [line for line in lines if "Error" in line.split(":")[0]]
+        return f": {(errors or lines)[0 if errors else -1]}" if lines else ""
+
+    def _fail(self, reason: str) -> ResolverError:
+        self.failure = reason
+        log.warning("TypeScript references fall back to possible arrows: %s", reason)
+        if self._process is not None and self._process.poll() is None:
+            self._process.kill()
+        self.close()
+        return ResolverError(f"TypeScript resolver unavailable: {reason}")
+
+
 class Resolver:
     """definition_at and reference search for the files of one repository, read from its working tree."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, node: str = "node"):
         self.root = root.resolve()
+        self.node = node  # the Node executable for the TypeScript helper
         self._projects: dict[Path, jedi.Project] = {}
         self._scripts: dict[str, jedi.Script] = {}
         self._modules: frozenset[str] | None = None
+        self._typescript: TypeScript | None = None
+        self._lines: dict[str, list[str]] = {}
+
+    @property
+    def typescript_failure(self) -> str:
+        """Why TypeScript answers fell back to possible arrows, for the comment's notes; "" when they did not."""
+        return self._typescript.failure if self._typescript is not None else ""
+
+    def close(self) -> None:
+        """Stop the TypeScript helper, if it was started."""
+        if self._typescript is not None:
+            self._typescript.close()
 
     def definition_at(self, path: str, line: int, column: int) -> list[Location]:
         """Where the identifier at path:line:column (1-based line, character column) is defined."""
+        if Path(path).suffix in TYPESCRIPT:
+            return self._ask_locations("definition", path, line, column)
         script = self._script(path, line, column)
         try:
             names = script.goto(line, column, follow_imports=True)
@@ -142,9 +302,15 @@ class Resolver:
     def references(self, path: str, line: int, column: int) -> list[Location]:
         """Every place jedi finds that refers to the definition named at path:line:column, without itself.
 
-        Import lines are included; jedi finds the name in a renaming import
+        Import lines are included. jedi finds the name in a renaming import
         but not the calls through it (C46), and may stop early (C24).
+        TypeScript's findReferences follows renames, interfaces and
+        constructors (C43 to C45, C53, C62); its definition entries are left
+        out.
         """
+        if Path(path).suffix in TYPESCRIPT:
+            found = self._ask_locations("references", path, line, column)
+            return [loc for loc in found if (loc.path, loc.line, loc.column) != (path, line, column)]
         script = self._script(path, line, column)
         try:
             names = script.get_references(line, column, scope="project")
@@ -188,9 +354,16 @@ class Resolver:
         leftmost name, and a parameter through its type annotation, one step
         only. Anything else, such as an untyped parameter or a variable
         assigned twice, is "".
+
+        TypeScript is traced by the helper with the type checker, the same
+        way: an import whose bare specifier is neither a workspace package
+        nor a `paths` key of the file's project is "library".
         """
+        if Path(path).suffix in TYPESCRIPT:
+            request = {"op": "trace", **self._where(path, line, column)}
+            return self._helper().ask(request)["traced"]
         if Path(path).suffix != ".py":
-            raise ResolverError(f"tracing imports in {path}: only Python files are supported")
+            raise ResolverError(f"tracing imports in {path}: no resolver for {Path(path).suffix} files")
         source = self._source(path).encode("utf-8")
         tree = constructs.syntax(path, source)
         lines = source.split(b"\n")
@@ -202,6 +375,77 @@ class Resolver:
         if module.startswith(".") or self._in_repository(module.split(".")[0]):
             return "repository"
         return "library"
+
+    def structural(self, target: Construct, constructs: Iterable[Construct]) -> frozenset[str]:
+        """Interface members a TypeScript method may be called through by shape (design, step 6).
+
+        A member with the method's name, in an interface its class is
+        assignable to by the type checker (C63, C64), whether or not the class
+        says `implements`. The helper also requires the member to be a
+        function: a method signature, or a property whose type has call
+        signatures. Raises ResolverError when the helper fails.
+        """
+        found: set[str] = set()
+        by_id = {c.id: c for c in constructs}
+        cls = by_id.get(target.parent or "")
+        if Path(target.path).suffix not in TYPESCRIPT or target.kind != "method" or cls is None:
+            return frozenset()
+        for c in by_id.values():
+            holder = by_id.get(c.parent or "")
+            if c.kind != "member" or _short(c) != _short(target) or holder is None or holder.id == cls.id:
+                continue
+            if holder.kind != "class" or Path(c.path).suffix not in TYPESCRIPT:
+                continue
+            request = {
+                "op": "assignable",
+                "source": self._where(cls.path, cls.line, cls.column),
+                "target": self._where(c.path, c.line, c.column),
+            }
+            if self._helper().ask(request)["assignable"]:
+                found.add(c.id)
+        return frozenset(found)
+
+    def _helper(self) -> TypeScript:
+        if self._typescript is None:
+            packages = [
+                file.parent.relative_to(self.root).as_posix()
+                for file in walk_files(self.root)
+                if file.name == "package.json"
+            ]
+            self._typescript = TypeScript(self.root, packages, self.node)
+        return self._typescript
+
+    def _where(self, path: str, line: int, column: int) -> dict:
+        """A site as the helper takes it: the column in UTF-16 code units, TypeScript's unit."""
+        text = self._line(path, line)
+        return {"file": path, "line": line, "column": len(text[:column].encode("utf-16-le")) // 2}
+
+    def _ask_locations(self, op: str, path: str, line: int, column: int) -> list[Location]:
+        answer = self._helper().ask({"op": op, **self._where(path, line, column)})
+        return [self._ts_location(found) for found in answer["locations"]]
+
+    def _ts_location(self, found: dict) -> Location:
+        """A helper location as a Location: column back in characters; outside the repository, or in a
+        skipped directory (an installed package, the compiler's own lib files), path is None."""
+        file = Path(found["file"])
+        path = None
+        if file.is_relative_to(self.root):
+            rel = file.relative_to(self.root)
+            if not SKIP_DIRS.intersection(rel.parts[:-1]):
+                path = rel.as_posix()
+        column = found["column"]
+        if path is not None:
+            units = self._line(path, found["line"]).encode("utf-16-le")[: 2 * column]
+            column = len(units.decode("utf-16-le"))
+        return Location(path, found["line"], column, found["kind"], found["name"], found["local"])
+
+    def _line(self, path: str, line: int) -> str:
+        if path not in self._lines:
+            self._lines[path] = self._source(path).split("\n")
+        lines = self._lines[path]
+        if not 1 <= line <= len(lines):
+            raise ResolverError(f"reading {path}:{line} for the resolver: the file has {len(lines)} lines")
+        return lines[line - 1]
 
     def _in_repository(self, top: str) -> bool:
         """A top-level module is in the repository when a `<top>.py` file or a `<top>` directory holding
@@ -234,7 +478,7 @@ class Resolver:
 
     def _script(self, path: str, line: int, column: int) -> jedi.Script:
         if Path(path).suffix != ".py":
-            raise ResolverError(f"resolving {path}:{line}:{column}: no resolver for {Path(path).suffix} files yet")
+            raise ResolverError(f"resolving {path}:{line}:{column}: no resolver for {Path(path).suffix} files")
         if path not in self._scripts:
             self._scripts[path] = jedi.Script(self._source(path), path=self.root / path, project=self._project(path))
         return self._scripts[path]
@@ -366,11 +610,20 @@ def verdict(candidate: Candidate, answer: Answer, code: Code, named: Sequence[st
     if answer.error:
         return _unresolved(candidate, named, f"resolver failed: {answer.error}")
 
+    locations = answer.locations
+    if Path(candidate.path).suffix in TYPESCRIPT:
+        # Without the library installed, TypeScript answers a library name with its own import line (C57),
+        # and an import of a missing repository module the same way: that says nothing yet (design, step 6).
+        locations = tuple(loc for loc in locations if loc.kind != "alias")
+        locations, note = _read_construction(locations, candidate, code)
+        if note:
+            return Verdict("", target=candidate.target or "", note=note)
+
     boxes: list[str] = []
     uncertain = ""
     local = refers = False
     refers_to = ""
-    for loc in answer.locations:
+    for loc in locations:
         box = code.positions.get((loc.path, loc.line, loc.column)) if loc.path is not None else None
         if box is not None:
             box, how = _read_class_answer(box, candidate, code)
@@ -393,7 +646,7 @@ def verdict(candidate: Candidate, answer: Answer, code: Code, named: Sequence[st
             return Verdict("possible", candidate.target, f"through `{uncertain}`")
         return Verdict("exact", candidate.target)
     if candidate.role == CALLER and candidate.target not in boxes:
-        through = sorted(related(candidate.target, code).intersection(boxes)) if candidate.target else []
+        through = sorted(_related(candidate, code).intersection(boxes)) if candidate.target else []
         if through:
             return Verdict("possible", candidate.target, f"through `{through[0]}`")
     if boxes:
@@ -404,11 +657,69 @@ def verdict(candidate: Candidate, answer: Answer, code: Code, named: Sequence[st
         return Verdict("")
     if refers:
         return Verdict("", note="refers", refers_to=refers_to) if candidate.role != REMOVED else Verdict("")
-    if answer.locations:
+    if locations:
         return Verdict("")  # a definition outside the repository
     if answer.traced == "library":
         return Verdict("", note="library")
     return _unresolved(candidate, named, "unresolved import" if answer.traced == "repository" else "unresolved")
+
+
+def _related(candidate: Candidate, code: Code) -> set[str]:
+    """Boxes a caller may reach the candidate's target through (design, step 6, "Related box").
+
+    TypeScript: any box the site resolves to when the site came from the
+    target's own findReferences, which links them through renames,
+    interfaces, base classes and typed object literals (C43 to C45, C54);
+    and the interface members the target's class matches by shape
+    (Code.implements). Python: see related.
+    """
+    target = code.constructs[candidate.target or ""]
+    if Path(target.path).suffix not in TYPESCRIPT:
+        return related(target.id, code)
+    linked = set(code.implements.get(target.id, ()))
+    if candidate.referenced:
+        linked.update(code.positions.values())
+    return linked
+
+
+def _read_construction(
+    locations: tuple[Location, ...], candidate: Candidate, code: Code
+) -> tuple[tuple[Location, ...], str]:
+    """Read a TypeScript construction against the candidate's target (design, step 6).
+
+    `new Foo(1)`, `super(...)` and `new this(...)` answer with the class and
+    the constructor that runs (C52, C61); `new Plain(3)` for a subclass
+    without its own constructor answers Plain and its base's constructor.
+    The pair counts as the class when the class is the target, else as the
+    constructor; for a callee, as the class when it inherits the
+    constructor. A type annotation or `Foo.make()` answers the class alone,
+    which stays the class. A call of the class whose removed constructor is
+    the target returns the note "removed constructor".
+    """
+    box_at = {loc: code.positions.get((loc.path, loc.line, loc.column)) for loc in locations}
+    classes = {b for b in box_at.values() if b is not None and code.constructs[b].kind == "class"}
+    target = code.constructs.get(candidate.target or "")
+    if (
+        candidate.role == REMOVED
+        and candidate.call
+        and target is not None
+        and _short(target) == "constructor"
+        and target.parent in classes
+    ):
+        return locations, "removed constructor"
+    runs = [loc for loc in locations if loc.kind == "constructor" and box_at[loc] is not None]
+    if not runs:
+        return locations, ""
+    inherited = {b for b in classes if not any(code.constructs[box_at[r]].parent == b for r in runs)}
+    if candidate.role != CALLEE and candidate.target in classes:
+        chosen = {loc for loc in locations if box_at[loc] == candidate.target}
+    elif candidate.role == CALLEE and inherited:
+        # A callee `new Plain()` is one arrow to the constructor when the class defines one, else to the class.
+        chosen = {loc for loc in locations if box_at[loc] in inherited}
+    else:
+        chosen = set(runs)
+    pair = set(runs) | {loc for loc in locations if box_at[loc] in classes}
+    return tuple(loc for loc in locations if loc in chosen or loc not in pair), ""
 
 
 def _read_class_answer(box: str, candidate: Candidate, code: Code) -> tuple[str, str]:
@@ -419,8 +730,8 @@ def _read_class_answer(box: str, candidate: Candidate, code: Code) -> tuple[str,
     name; or a note: "removed constructor", or "resolver failed: ...".
     """
     c = code.constructs[box]
-    if c.kind != "class":
-        return box, ""
+    if c.kind != "class" or Path(c.path).suffix != ".py":
+        return box, ""  # TypeScript constructions are read by _read_construction
     if candidate.role == CALLEE:
         if candidate.call:
             live = set(code.positions.values())
