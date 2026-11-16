@@ -14,6 +14,16 @@ Work does not start on a stage until the gate before it passes.
 
 Spec files live in `<specDir>/<feature>/` (default `docs/specs/<feature>/`).
 
+## After a task
+
+When a task's branch is pushed, run `scripts/clean_checkout.py <checkout>`
+on the clone or worktree it used. It deletes git-ignored build folders:
+Unreal's `Intermediate`, `Binaries` and `DerivedDataCache`, Godot's
+`.godot`, `.vs` and `__pycache__`. Once the branch is merged, add `--remove`
+to delete the checkout as well. The script refuses a checkout that has
+uncommitted changes or commits on no remote branch, and lists them, so it
+never deletes work that exists only on that disk.
+
 ## When to skip stages
 
 If you can describe the diff in one sentence, skip stages 1 to 3 and write

@@ -56,6 +56,7 @@ Outside the stages:
 | `check_citations.py` | Each cited quote appears at its source, the source's domain supports the claimed tier, and Tier 3 sources are only pointers |
 | `check_ac_coverage.py` | Every approved acceptance criterion has a tagged test, and no test cites a criterion that does not exist |
 | `detect_workarounds.py` | No new test skips, lint or type suppressions, coverage exclusions, threshold edits or deleted tests without a `groundwork-allow: <reason>` (a re-based threshold carries the reason on its new line, which also covers the old one) |
+| `clean_checkout.py` | A finished checkout's ignored build folders are deleted, and with `--remove` the checkout too, only when it has no uncommitted changes and no commits missing from a remote |
 | `design-reviewer` agent | Real alternatives, every criterion met, reuse claims true, project rules followed |
 | `code-reviewer` agent | No gamed tests, criteria tests that can fail, design followed, no duplicated code |
 | `citation-verifier` agent | Each quote supports its claim |
